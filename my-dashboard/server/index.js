@@ -54,6 +54,16 @@ app.get('/api/health', (req, res) => {
   res.json({ ok: true });
 });
 
+app.get('/api/health/db', (req, res) => {
+  db.get('SELECT 1 as ok', [], (err) => {
+    if (err) {
+      console.error('DB health check failed:', err?.stack || err);
+      return res.status(500).json({ ok: false });
+    }
+    return res.json({ ok: true });
+  });
+});
+
 const uploadsDir = isNetlify ? path.join('/tmp', 'uploads') : path.join(__dirname, 'uploads');
 if (!useSupabaseStorage) {
   if (!fs.existsSync(uploadsDir)) {
@@ -726,6 +736,7 @@ app.post('/api/auth/login', async (req, res) => {
       }
     });
   } catch (err) {
+    console.error('Login failed:', err?.stack || err);
     res.status(500).json({ message: 'Server error' });
   }
 });
