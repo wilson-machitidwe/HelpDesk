@@ -5,8 +5,7 @@ const toDateKey = (date) => date.toISOString().slice(0, 10);
 const formatLong = (date) => {
   const dd = String(date.getDate()).padStart(2, '0');
   const mm = String(date.getMonth() + 1).padStart(2, '0');
-  const yyyy = date.getFullYear();
-  return `${dd}/${mm}/${yyyy}`;
+  return `${dd}/${mm}`;
 };
 
 const buildChurnData = (tickets, days) => {
@@ -43,26 +42,17 @@ const buildChurnData = (tickets, days) => {
 const TicketChurnChart = ({ tickets }) => {
   const data = useMemo(() => buildChurnData(tickets || [], 8), [tickets]);
   return (
-    <div className="w-full h-96 bg-white p-4">
-      <h3 className="text-sm font-bold text-gray-700 mb-4">Ticket Churn</h3>
-      {/* layout="vertical" is what makes the bars go sideways */}
-      <ResponsiveContainer width="100%" height="90%">
-        <BarChart
-          layout="vertical" 
-          data={data}
-          margin={{ top: 5, right: 30, left: 40, bottom: 5 }}
-        >
+    <div className="w-full h-64 bg-white p-4">
+      <h3 className="text-sm font-bold text-gray-700 mb-3">Ticket Churn</h3>
+      <ResponsiveContainer width="100%" height="88%">
+        <BarChart layout="vertical" data={data} margin={{ top: 5, right: 16, left: 16, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#eee" />
-          {/* YAxis is now the dates */}
-          <YAxis dataKey="date" type="category" fontSize={11} tickMargin={10} width={80} />
-          {/* XAxis is now the numbers */}
-          <XAxis type="number" fontSize={11} domain={[0, 'dataMax + 0.5']} allowDecimals={true} />
-          <Tooltip cursor={{fill: '#f4f6f8'}}/>
+          <YAxis dataKey="date" type="category" fontSize={10} tickMargin={8} width={52} />
+          <XAxis type="number" fontSize={10} domain={[0, 'dataMax + 0.5']} allowDecimals />
+          <Tooltip cursor={{ fill: '#f4f6f8' }} />
           <Legend iconType="rect" verticalAlign="bottom" />
-          
-          {/* stackId="a" links these two bars together so they stack */}
-          <Bar dataKey="open" stackId="a" fill="#E86C24" barSize={20} name="Open" />
-          <Bar dataKey="closed" stackId="a" fill="#007DA3" barSize={20} name="Closed" />
+          <Bar dataKey="open" stackId="a" fill="#E86C24" barSize={14} name="Open" />
+          <Bar dataKey="closed" stackId="a" fill="#007DA3" barSize={14} name="Closed" />
         </BarChart>
       </ResponsiveContainer>
     </div>

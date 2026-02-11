@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import TicketHistoryChart from './TicketHistoryChart';
 import DonutChart from './DonutChart';
-import TicketChurnChart from './TicketChurnChart'; // 1. Import the new chart
+import TicketChurnChart from './TicketChurnChart';
 import { API_BASE } from '../config/apiBase';
 
 const DashboardCharts = ({ refreshKey, hasTask }) => {
@@ -11,7 +11,7 @@ const DashboardCharts = ({ refreshKey, hasTask }) => {
     const fetchTickets = async () => {
       const token = localStorage.getItem('token');
       const response = await fetch(`${API_BASE}/api/tickets`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` }
       });
       const data = await response.json();
       setTickets(Array.isArray(data) ? data : []);
@@ -49,16 +49,13 @@ const DashboardCharts = ({ refreshKey, hasTask }) => {
   const noWidgets = !showHistory && !showChurn && !showFirstResponse && !showCloseTime && !showCategory && !showCreators;
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6 px-6">
-      {/* Left Column: Big Charts */}
-      <div className="lg:col-span-2 space-y-6">
+    <div className="grid grid-cols-1 xl:grid-cols-5 gap-5 mt-6 px-6">
+      <div className="xl:col-span-3 space-y-5">
         {showHistory && (
           <div className="bg-white rounded-md border border-gray-200 shadow-sm overflow-hidden">
             <TicketHistoryChart tickets={tickets} />
           </div>
         )}
-        
-        {/* 2. Replace the placeholder div with the actual component */}
         {showChurn && (
           <div className="bg-white rounded-md border border-gray-200 shadow-sm overflow-hidden">
             <TicketChurnChart tickets={tickets} />
@@ -66,23 +63,24 @@ const DashboardCharts = ({ refreshKey, hasTask }) => {
         )}
       </div>
 
-      {/* Right Column: Mini Stats & Donut Charts (Keep this section the same) */}
-      <div className="space-y-6">
-         {/* ... existing mini stats cards ... */}
-        {showFirstResponse && (
-          <div className="bg-white p-4 rounded-md border border-gray-200 shadow-sm">
-            <h4 className="text-xs font-bold text-gray-500 uppercase">First Response Time</h4>
-            <p className="text-2xl text-gray-400 font-light mt-1">--</p>
-            <p className="text-[10px] text-gray-400 uppercase">Average</p>
-          </div>
-        )}
-        {showCloseTime && (
-          <div className="bg-white p-4 rounded-md border border-gray-200 shadow-sm">
-            <h4 className="text-xs font-bold text-gray-500 uppercase">Tickets Close Time</h4>
-            <p className="text-2xl text-gray-400 font-light mt-1">--</p>
-            <p className="text-[10px] text-gray-400 uppercase">Average</p>
-          </div>
-        )}
+      <div className="xl:col-span-2 space-y-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {showFirstResponse && (
+            <div className="bg-white p-4 rounded-md border border-gray-200 shadow-sm">
+              <h4 className="text-xs font-bold text-gray-500 uppercase">First Response Time</h4>
+              <p className="text-2xl text-gray-400 font-light mt-1">--</p>
+              <p className="text-[10px] text-gray-400 uppercase">Average</p>
+            </div>
+          )}
+          {showCloseTime && (
+            <div className="bg-white p-4 rounded-md border border-gray-200 shadow-sm">
+              <h4 className="text-xs font-bold text-gray-500 uppercase">Tickets Close Time</h4>
+              <p className="text-2xl text-gray-400 font-light mt-1">--</p>
+              <p className="text-[10px] text-gray-400 uppercase">Average</p>
+            </div>
+          )}
+        </div>
+
         {showCategory && (
           <div className="bg-white rounded-md border border-gray-200 shadow-sm overflow-hidden">
             <DonutChart title="Category Breakdown" data={categoryData} />

@@ -464,6 +464,33 @@ const defaultNotificationMatrix = {
   reopened: { creator: true, assignee: true, technician: true, manager: true, admin: true }
 };
 
+const defaultNotificationTemplates = {
+  opened: {
+    subject: 'New Ticket #{ticketId}: {summary}',
+    body: 'Event: opened\nTicket ID: {ticketId}\nSummary: {summary}\nDepartment: {department}\nStatus: {status}\nPriority: {priority}\nCategory: {category}\nAssignee: {assignee}\nActor: {actor}'
+  },
+  assigned: {
+    subject: 'Ticket Assigned #{ticketId}: {summary}',
+    body: 'Event: assigned\nTicket ID: {ticketId}\nSummary: {summary}\nDepartment: {department}\nStatus: {status}\nPriority: {priority}\nCategory: {category}\nAssignee: {assignee}\nActor: {actor}'
+  },
+  commented: {
+    subject: 'New Comment on Ticket #{ticketId}',
+    body: 'Event: commented\nTicket ID: {ticketId}\nSummary: {summary}\nDepartment: {department}\nStatus: {status}\nPriority: {priority}\nCategory: {category}\nAssignee: {assignee}\nActor: {actor}\nComment: {comment}'
+  },
+  closed: {
+    subject: 'Ticket Closed #{ticketId}: {summary}',
+    body: 'Event: closed\nTicket ID: {ticketId}\nSummary: {summary}\nDepartment: {department}\nStatus: {status}\nPriority: {priority}\nCategory: {category}\nAssignee: {assignee}\nActor: {actor}'
+  },
+  closedDuplicate: {
+    subject: 'Ticket Closed as Duplicate #{ticketId}: {summary}',
+    body: 'Event: closedDuplicate\nTicket ID: {ticketId}\nSummary: {summary}\nDepartment: {department}\nStatus: {status}\nPriority: {priority}\nCategory: {category}\nAssignee: {assignee}\nActor: {actor}'
+  },
+  reopened: {
+    subject: 'Ticket Reopened #{ticketId}: {summary}',
+    body: 'Event: reopened\nTicket ID: {ticketId}\nSummary: {summary}\nDepartment: {department}\nStatus: {status}\nPriority: {priority}\nCategory: {category}\nAssignee: {assignee}\nActor: {actor}'
+  }
+};
+
 function ensureNotificationSettings() {
   return new Promise((resolve) => {
     db.get('SELECT * FROM notification_settings WHERE id = 1', [], (err, row) => {
@@ -474,18 +501,20 @@ function ensureNotificationSettings() {
         notifyOnComment: 1,
         roleRecipients: JSON.stringify(['Admin']),
         userRecipients: JSON.stringify([]),
-        notification_matrix: JSON.stringify(defaultNotificationMatrix)
+        notification_matrix: JSON.stringify(defaultNotificationMatrix),
+        notification_templates: JSON.stringify(defaultNotificationTemplates)
       };
       db.run(
-        `INSERT INTO notification_settings (id, notifyOnCreate, notifyOnUpdate, notifyOnComment, roleRecipients, userRecipients, notification_matrix)
-         VALUES (1, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO notification_settings (id, notifyOnCreate, notifyOnUpdate, notifyOnComment, roleRecipients, userRecipients, notification_matrix, notification_templates)
+         VALUES (1, ?, ?, ?, ?, ?, ?, ?)`,
         [
           defaults.notifyOnCreate,
           defaults.notifyOnUpdate,
           defaults.notifyOnComment,
           defaults.roleRecipients,
           defaults.userRecipients,
-          defaults.notification_matrix
+          defaults.notification_matrix,
+          defaults.notification_templates
         ],
         () => resolve({ id: 1, ...defaults })
       );
@@ -500,7 +529,17 @@ async function getNotificationSettings() {
     acc[key] = { ...defaultNotificationMatrix[key], ...(rawMatrix?.[key] || {}) };
     return acc;
   }, {});
-  return { matrix };
+
+  const rawTemplates = row.notification_templates ? JSON.parse(row.notification_templates) : defaultNotificationTemplates;
+  const templates = Object.keys(defaultNotificationTemplates).reduce((acc, key) => {
+    acc[key] = {
+      ...defaultNotificationTemplates[key],
+      ...(rawTemplates?.[key] || {})
+    };
+    return acc;
+  }, {});
+
+  return { matrix, templates };
 }
 
 function findUserByUsernameOrDisplay(name) {
@@ -1640,3 +1679,4 @@ if (!isNetlify) {
 }
 
 module.exports = { app, ready };
+

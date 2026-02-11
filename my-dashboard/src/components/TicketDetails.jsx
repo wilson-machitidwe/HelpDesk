@@ -9,6 +9,10 @@ const formatDate = (value) => {
 };
 
 const TicketDetails = ({ ticketId, initialTicket, profile, hasTask, onBack }) => {
+  const attachmentHref = (url) => {
+    if (!url) return '#';
+    return /^https?:\/\//i.test(url) ? url : `${API_BASE}${url}`;
+  };
   const [ticket, setTicket] = useState(initialTicket || null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -369,7 +373,7 @@ const TicketDetails = ({ ticketId, initialTicket, profile, hasTask, onBack }) =>
                   {ticket.attachments.map((att) => (
                     <li key={att.id} className="flex items-center gap-2">
                       <a
-                        href={`${API_BASE}${att.url}`}
+                        href={attachmentHref(att.url)}
                         target="_blank"
                         rel="noreferrer"
                         className="text-orange-600 hover:underline"
@@ -377,7 +381,7 @@ const TicketDetails = ({ ticketId, initialTicket, profile, hasTask, onBack }) =>
                         {att.originalName}
                       </a>
                       <a
-                        href={`${API_BASE}${att.url}`}
+                        href={attachmentHref(att.url)}
                         download
                         className="text-xs text-gray-500 hover:text-gray-700"
                       >
@@ -534,7 +538,7 @@ const TicketDetails = ({ ticketId, initialTicket, profile, hasTask, onBack }) =>
                         {comment.attachments.map((att) => (
                           <div key={att.id} className="flex items-center gap-2">
                             <a
-                              href={`${API_BASE}${att.url}`}
+                              href={attachmentHref(att.url)}
                               target="_blank"
                               rel="noreferrer"
                               className="text-xs text-orange-600 hover:underline"
@@ -542,7 +546,7 @@ const TicketDetails = ({ ticketId, initialTicket, profile, hasTask, onBack }) =>
                               {att.originalName}
                             </a>
                             <a
-                              href={`${API_BASE}${att.url}`}
+                              href={attachmentHref(att.url)}
                               download
                               className="text-xs text-gray-500 hover:text-gray-700"
                             >
@@ -596,3 +600,6 @@ const TicketDetails = ({ ticketId, initialTicket, profile, hasTask, onBack }) =>
 };
 
 export default TicketDetails;
+
+
+

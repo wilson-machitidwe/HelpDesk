@@ -8,7 +8,7 @@ const ReportsPage = ({ profile }) => {
   const [reportData, setReportData] = useState([]);
   const [auditData, setAuditData] = useState([]);
   const [lastReportType, setLastReportType] = useState('');
-  const [reportType, setReportType] = useState('user_activity');
+  const [reportType, setReportType] = useState('ticket_volume');
   const [auditFrom, setAuditFrom] = useState('');
   const [auditTo, setAuditTo] = useState('');
 
@@ -22,22 +22,20 @@ const ReportsPage = ({ profile }) => {
       const res = await fetch(`${API_BASE}/api/reports/run`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({
-          type: reportType,
-          from: auditFrom || null,
-          to: auditTo || null
-        })
+        body: JSON.stringify({ type: reportType, from: auditFrom || null, to: auditTo || null })
       });
       const data = await res.json();
       if (!res.ok) {
         setMessage(data.message || 'Failed to pull report.');
+        setReportData([]);
         return;
       }
       setReportData(Array.isArray(data.data) ? data.data : []);
       setLastReportType(reportType);
-      setMessage(data.message || `Report request submitted: ${reportType.replace('_', ' ')}`);
+      setMessage(data.message || `Report fetched: ${reportType.replace('_', ' ')}`);
     } catch (err) {
       setMessage('Failed to pull report.');
+      setReportData([]);
     } finally {
       setReportSubmitting(false);
     }
@@ -52,21 +50,20 @@ const ReportsPage = ({ profile }) => {
       const res = await fetch(`${API_BASE}/api/audit/run`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({
-          from: auditFrom || null,
-          to: auditTo || null
-        })
+        body: JSON.stringify({ from: auditFrom || null, to: auditTo || null })
       });
       const data = await res.json();
       if (!res.ok) {
         setMessage(data.message || 'Failed to pull audit trail.');
+        setAuditData([]);
         return;
       }
       setAuditData(Array.isArray(data.data) ? data.data : []);
       const rangeLabel = auditFrom || auditTo ? ` (${auditFrom || 'Any'} to ${auditTo || 'Any'})` : '';
-      setMessage(data.message || `Audit trail request submitted${rangeLabel}.`);
+      setMessage(data.message || `Audit trail fetched${rangeLabel}.`);
     } catch (err) {
       setMessage('Failed to pull audit trail.');
+      setAuditData([]);
     } finally {
       setAuditSubmitting(false);
     }
@@ -83,10 +80,7 @@ const ReportsPage = ({ profile }) => {
       if (/[",\n]/.test(str)) return `"${str.replace(/"/g, '""')}"`;
       return str;
     };
-    const lines = [
-      headers.join(','),
-      ...rows.map((row) => headers.map((h) => escape(row[h])).join(','))
-    ];
+    const lines = [headers.join(','), ...rows.map((row) => headers.map((h) => escape(row[h])).join(','))];
     const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -119,9 +113,7 @@ const ReportsPage = ({ profile }) => {
         <body>
           <h1>${title}</h1>
           <table>
-            <thead>
-              <tr>${headers.map((h) => `<th>${h}</th>`).join('')}</tr>
-            </thead>
+            <thead><tr>${headers.map((h) => `<th>${h}</th>`).join('')}</tr></thead>
             <tbody>
               ${rows.map((row) => `<tr>${headers.map((h) => `<td>${row[h] ?? ''}</td>`).join('')}</tr>`).join('')}
             </tbody>
@@ -148,43 +140,21 @@ const ReportsPage = ({ profile }) => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
           <div>
             <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Report Type</label>
-            <select
-              value={reportType}
-              onChange={(e) => setReportType(e.target.value)}
-              className="w-full border p-2 rounded text-sm"
-            >
-              <option value="user_activity">User Activity</option>
+            <select value={reportType} onChange={(e) => setReportType(e.target.value)} className="w-full border p-2 rounded text-sm">
               <option value="ticket_volume">Ticket Volume</option>
               <option value="sla_performance">SLA Performance</option>
               <option value="technician_workload">Technician Workload</option>
             </select>
           </div>
           <div className="md:col-span-2">
-            <button
-              type="button"
-              onClick={handlePullReports}
-              className="bg-gray-900 text-white font-bold py-2 px-4 rounded hover:bg-gray-800 text-sm disabled:opacity-60"
-              disabled={reportSubmitting}
-            >
+            <button type="button" onClick={handlePullReports} className="bg-gray-900 text-white font-bold py-2 px-4 rounded hover:bg-gray-800 text-sm disabled:opacity-60" disabled={reportSubmitting}>
               {reportSubmitting ? 'Requesting...' : 'Pull Report From System'}
             </button>
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => downloadCsv(reportData, `${lastReportType || 'report'}.csv`)}
-            className="bg-gray-100 text-gray-700 border border-gray-300 font-bold py-2 px-4 rounded text-sm"
-          >
-            Download CSV
-          </button>
-          <button
-            type="button"
-            onClick={() => downloadPdf(`Report: ${lastReportType || 'Report'}`, reportData)}
-            className="bg-gray-100 text-gray-700 border border-gray-300 font-bold py-2 px-4 rounded text-sm"
-          >
-            Download PDF
-          </button>
+          <button type="button" onClick={() => downloadCsv(reportData, `${lastReportType || 'report'}.csv`)} className="bg-gray-100 text-gray-700 border border-gray-300 font-bold py-2 px-4 rounded text-sm">Download CSV</button>
+          <button type="button" onClick={() => downloadPdf(`Report: ${lastReportType || 'Report'}`, reportData)} className="bg-gray-100 text-gray-700 border border-gray-300 font-bold py-2 px-4 rounded text-sm">Download PDF</button>
         </div>
         {reportData?.length > 0 && (
           <div className="overflow-x-auto">
@@ -208,31 +178,20 @@ const ReportsPage = ({ profile }) => {
             </table>
           </div>
         )}
+        {reportData?.length === 0 && <p className="text-xs text-gray-500">No report data returned for the selected filters.</p>}
       </div>
 
       <div className="bg-white border border-gray-200 rounded-md shadow-sm p-4 space-y-3">
         <h3 className="text-sm font-bold text-gray-700 uppercase">Audit Trail</h3>
-        <p className="text-xs text-gray-600">
-          Available to Managers and Admins. Tracks actions and login activity, including logins without actions.
-        </p>
+        <p className="text-xs text-gray-600">Available to Managers and Admins. Tracks actions and login activity.</p>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
           <div>
             <label className="block text-xs font-bold text-gray-500 uppercase mb-1">From</label>
-            <input
-              type="date"
-              value={auditFrom}
-              onChange={(e) => setAuditFrom(e.target.value)}
-              className="w-full border p-2 rounded text-sm"
-            />
+            <input type="date" value={auditFrom} onChange={(e) => setAuditFrom(e.target.value)} className="w-full border p-2 rounded text-sm" />
           </div>
           <div>
             <label className="block text-xs font-bold text-gray-500 uppercase mb-1">To</label>
-            <input
-              type="date"
-              value={auditTo}
-              onChange={(e) => setAuditTo(e.target.value)}
-              className="w-full border p-2 rounded text-sm"
-            />
+            <input type="date" value={auditTo} onChange={(e) => setAuditTo(e.target.value)} className="w-full border p-2 rounded text-sm" />
           </div>
           <div className="md:col-span-2">
             <button
@@ -246,24 +205,10 @@ const ReportsPage = ({ profile }) => {
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => downloadCsv(auditData, 'audit-trail.csv')}
-            className="bg-gray-100 text-gray-700 border border-gray-300 font-bold py-2 px-4 rounded text-sm"
-          >
-            Download CSV
-          </button>
-          <button
-            type="button"
-            onClick={() => downloadPdf('Audit Trail', auditData)}
-            className="bg-gray-100 text-gray-700 border border-gray-300 font-bold py-2 px-4 rounded text-sm"
-          >
-            Download PDF
-          </button>
+          <button type="button" onClick={() => downloadCsv(auditData, 'audit-trail.csv')} className="bg-gray-100 text-gray-700 border border-gray-300 font-bold py-2 px-4 rounded text-sm">Download CSV</button>
+          <button type="button" onClick={() => downloadPdf('Audit Trail', auditData)} className="bg-gray-100 text-gray-700 border border-gray-300 font-bold py-2 px-4 rounded text-sm">Download PDF</button>
         </div>
-        {!canAccessAudit && (
-          <p className="text-xs text-gray-500">You need Manager or Admin access to pull audit trail data.</p>
-        )}
+        {!canAccessAudit && <p className="text-xs text-gray-500">You need Manager or Admin access to pull audit trail data.</p>}
         {auditData?.length > 0 && (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-sm">
@@ -288,9 +233,7 @@ const ReportsPage = ({ profile }) => {
         )}
       </div>
 
-      {message && (
-        <p className="text-sm text-orange-600 font-bold">{message}</p>
-      )}
+      {message && <p className="text-sm text-orange-600 font-bold">{message}</p>}
     </div>
   );
 };

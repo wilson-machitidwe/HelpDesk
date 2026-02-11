@@ -42,34 +42,17 @@ const buildHistoryData = (tickets, days) => {
 const TicketHistoryChart = ({ tickets }) => {
   const data = useMemo(() => buildHistoryData(tickets || [], 8), [tickets]);
   return (
-    <div className="w-full h-80 bg-white p-4">
-      <h3 className="text-sm font-bold text-gray-700 mb-4">Ticket History</h3>
-      <ResponsiveContainer width="100%" height="100%">
+    <div className="w-full h-64 bg-white p-4">
+      <h3 className="text-sm font-bold text-gray-700 mb-3">Ticket History</h3>
+      <ResponsiveContainer width="100%" height="88%">
         <LineChart data={data}>
           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eee" />
-          <XAxis dataKey="date" fontSize={12} tickMargin={10} />
-          <YAxis fontSize={12} domain={[0, 'dataMax + 1']} />
+          <XAxis dataKey="date" fontSize={11} tickMargin={8} />
+          <YAxis fontSize={11} domain={[0, 'dataMax + 1']} />
           <Tooltip />
           <Legend iconType="rect" align="center" verticalAlign="bottom" />
-          
-          {/* Line for Open Tickets (Orange) */}
-          <Line 
-            type="monotone" 
-            dataKey="open" 
-            stroke="#E86C24" 
-            strokeWidth={2} 
-            dot={{ r: 4, fill: '#E86C24' }} 
-            activeDot={{ r: 6 }} 
-          />
-          
-          {/* Line for Closed Tickets (Blue/Teal) */}
-          <Line 
-            type="monotone" 
-            dataKey="closed" 
-            stroke="#007DA3" 
-            strokeWidth={2} 
-            dot={{ r: 4, fill: '#007DA3' }} 
-          />
+          <Line type="monotone" dataKey="open" stroke="#E86C24" strokeWidth={2} dot={{ r: 3, fill: '#E86C24' }} activeDot={{ r: 5 }} />
+          <Line type="monotone" dataKey="closed" stroke="#007DA3" strokeWidth={2} dot={{ r: 3, fill: '#007DA3' }} />
         </LineChart>
       </ResponsiveContainer>
     </div>
