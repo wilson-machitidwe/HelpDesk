@@ -1,0 +1,106 @@
+import React, { useEffect, useState } from 'react';
+import TicketHistoryChart from './TicketHistoryChart';
+import DonutChart from './DonutChart';
+import TicketChurnChart from './TicketChurnChart'; // 1. Import the new chart
+import { API_BASE } from '../config/apiBase';
+
+const DashboardCharts = ({ refreshKey, hasTask }) => {
+  const [tickets, setTickets] = useState([]);
+
+  useEffect(() => {
+    const fetchTickets = async () => {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE}/api/tickets`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await response.json();
+      setTickets(Array.isArray(data) ? data : []);
+    };
+    fetchTickets();
+  }, [refreshKey]);
+
+  const categoryMap = tickets.reduce((acc, ticket) => {
+    const key = ticket.category || 'Unspecified';
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+  const categoryData = Object.keys(categoryMap).length
+    ? Object.entries(categoryMap).map(([name, value]) => ({ name, value }))
+    : [{ name: 'Unspecified', value: 1 }];
+
+  const creatorMap = tickets.reduce((acc, ticket) => {
+    const key = ticket.creator || 'Unknown';
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+  const creatorData = Object.keys(creatorMap).length
+    ? Object.entries(creatorMap)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([name, value]) => ({ name, value }))
+    : [{ name: 'No data', value: 1 }];
+
+  const showHistory = hasTask?.('View Ticket History Chart');
+  const showChurn = hasTask?.('View Ticket Churn Chart');
+  const showFirstResponse = hasTask?.('View First Response Time');
+  const showCloseTime = hasTask?.('View Tickets Close Time');
+  const showCategory = hasTask?.('View Category Breakdown');
+  const showCreators = hasTask?.('View Top Ticket Creators');
+  const noWidgets = !showHistory && !showChurn && !showFirstResponse && !showCloseTime && !showCategory && !showCreators;
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6 px-6">
+      {/* Left Column: Big Charts */}
+      <div className="lg:col-span-2 space-y-6">
+        {showHistory && (
+          <div className="bg-white rounded-md border border-gray-200 shadow-sm overflow-hidden">
+            <TicketHistoryChart tickets={tickets} />
+          </div>
+        )}
+        
+        {/* 2. Replace the placeholder div with the actual component */}
+        {showChurn && (
+          <div className="bg-white rounded-md border border-gray-200 shadow-sm overflow-hidden">
+            <TicketChurnChart tickets={tickets} />
+          </div>
+        )}
+      </div>
+
+      {/* Right Column: Mini Stats & Donut Charts (Keep this section the same) */}
+      <div className="space-y-6">
+         {/* ... existing mini stats cards ... */}
+        {showFirstResponse && (
+          <div className="bg-white p-4 rounded-md border border-gray-200 shadow-sm">
+            <h4 className="text-xs font-bold text-gray-500 uppercase">First Response Time</h4>
+            <p className="text-2xl text-gray-400 font-light mt-1">--</p>
+            <p className="text-[10px] text-gray-400 uppercase">Average</p>
+          </div>
+        )}
+        {showCloseTime && (
+          <div className="bg-white p-4 rounded-md border border-gray-200 shadow-sm">
+            <h4 className="text-xs font-bold text-gray-500 uppercase">Tickets Close Time</h4>
+            <p className="text-2xl text-gray-400 font-light mt-1">--</p>
+            <p className="text-[10px] text-gray-400 uppercase">Average</p>
+          </div>
+        )}
+        {showCategory && (
+          <div className="bg-white rounded-md border border-gray-200 shadow-sm overflow-hidden">
+            <DonutChart title="Category Breakdown" data={categoryData} />
+          </div>
+        )}
+        {showCreators && (
+          <div className="bg-white rounded-md border border-gray-200 shadow-sm overflow-hidden">
+            <DonutChart title="Top 5 Ticket Creators" data={creatorData} />
+          </div>
+        )}
+        {noWidgets && (
+          <div className="bg-white p-6 rounded-md border border-gray-200 shadow-sm text-sm text-gray-400">
+            No dashboard widgets assigned.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default DashboardCharts;

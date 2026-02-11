@@ -1,0 +1,13 @@
+[
+  {
+    "id": "1",
+    "username": "admin",
+    "password": "Shasheshi@3",
+    "role": "Admin",
+    "isSuper": true,
+    "firstName": "System",
+    "lastName": "Admin",
+    "email": "wilson@namikango.org",
+    "phone": "088-865-4433"
+  }
+]
