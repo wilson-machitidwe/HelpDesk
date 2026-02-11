@@ -1533,7 +1533,11 @@ const ready = dbReady
   .then(seedDepartments)
   .then(seedTasks)
   .then(seedRoleTasks)
-  .then(seedSampleTickets);
+  .then(seedSampleTickets)
+  .catch((err) => {
+    console.error('Server startup initialization failed:', err?.stack || err);
+    if (!isNetlify) throw err;
+  });
 
 if (!isNetlify) {
   ready.then(() => {
