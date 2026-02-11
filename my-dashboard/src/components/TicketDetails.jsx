@@ -34,6 +34,7 @@ const TicketDetails = ({ ticketId, initialTicket, profile, hasTask, onBack }) =>
 
   const canModify = profile?.role !== 'User' && hasTask && hasTask('Modify Tickets');
   const canClose = profile?.role !== 'User' && hasTask && hasTask('Close Tickets');
+  const canDeleteTicket = isAdmin && hasTask && hasTask('Delete Tickets');
   const canComment = hasTask && hasTask('Comment on Tickets');
   const canAssignOthers = canModify && (profile?.role === 'Admin' || profile?.role === 'Manager');
 
@@ -171,6 +172,30 @@ const TicketDetails = ({ ticketId, initialTicket, profile, hasTask, onBack }) =>
   const handleClose = async () => {
     setEditForm((prev) => ({ ...prev, status: 'Closed' }));
     await handleSave();
+  };
+
+  const handleDeleteTicket = async () => {
+    const ok = window.confirm(`Delete ticket #${ticketId}? This cannot be undone.`);
+    if (!ok) return;
+    setSaveMessage('');
+    setSaving(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE}/api/tickets/${ticketId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setSaveMessage(data.message || 'Failed to delete ticket.');
+        return;
+      }
+      onBack();
+    } catch (err) {
+      setSaveMessage('Failed to delete ticket.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleAddComment = async () => {
@@ -388,6 +413,15 @@ const TicketDetails = ({ ticketId, initialTicket, profile, hasTask, onBack }) =>
                     className="bg-gray-900 text-white font-bold py-2 px-4 rounded hover:bg-gray-800 text-sm disabled:opacity-60"
                   >
                     Close Ticket
+                  </button>
+                )}
+                {canDeleteTicket && (
+                  <button
+                    onClick={handleDeleteTicket}
+                    disabled={saving}
+                    className="bg-red-600 text-white font-bold py-2 px-4 rounded hover:bg-red-700 text-sm disabled:opacity-60"
+                  >
+                    Delete Ticket
                   </button>
                 )}
               </div>

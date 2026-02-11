@@ -96,11 +96,36 @@ const maybeUploadSingle = (field) => (req, res, next) => {
 const db = open();
 const dbReady = db?.ready || Promise.resolve();
 
+function readUserField(user, key) {
+  if (!user) return undefined;
+  const lower = key.toLowerCase();
+  if (Object.prototype.hasOwnProperty.call(user, key)) return user[key];
+  if (Object.prototype.hasOwnProperty.call(user, lower)) return user[lower];
+  return undefined;
+}
+
+function normalizeUser(user) {
+  if (!user) return null;
+  return {
+    ...user,
+    id: user.id ?? readUserField(user, 'id'),
+    username: user.username ?? readUserField(user, 'username'),
+    role: user.role ?? readUserField(user, 'role'),
+    password: user.password ?? readUserField(user, 'password'),
+    firstName: readUserField(user, 'firstName') || '',
+    lastName: readUserField(user, 'lastName') || '',
+    email: readUserField(user, 'email') || '',
+    phone: readUserField(user, 'phone') || '',
+    isSuper: !!Number(readUserField(user, 'isSuper')),
+    mustChangePassword: !!Number(readUserField(user, 'mustChangePassword'))
+  };
+}
+
 function findUserByUsername(username) {
   return new Promise((resolve, reject) => {
     db.get('SELECT * FROM users WHERE username = ?', [username], (err, row) => {
       if (err) return reject(err);
-      resolve(row);
+      resolve(normalizeUser(row));
     });
   });
 }
@@ -483,14 +508,14 @@ function findUserByUsernameOrDisplay(name) {
     if (!name) return resolve(null);
     db.get('SELECT * FROM users WHERE username = ?', [name], (err, row) => {
       if (err) return reject(err);
-      if (row) return resolve(row);
+      if (row) return resolve(normalizeUser(row));
       db.get(
         `SELECT * FROM users
          WHERE TRIM(COALESCE(firstName,'')) || ' ' || TRIM(COALESCE(lastName,'')) = ?`,
         [name],
         (err2, row2) => {
           if (err2) return reject(err2);
-          resolve(row2 || null);
+          resolve(normalizeUser(row2) || null);
         }
       );
     });
@@ -673,7 +698,7 @@ function findUserById(userId) {
   return new Promise((resolve, reject) => {
     db.get('SELECT * FROM users WHERE id = ?', [userId], (err, row) => {
       if (err) return reject(err);
-      resolve(row);
+      resolve(normalizeUser(row));
     });
   });
 }
@@ -956,7 +981,7 @@ app.post('/api/audit/run', authMiddleware, managerOrAdmin, (req, res) => {
 app.get('/api/users', authMiddleware, (req, res) => {
   db.all('SELECT id, username, role, isSuper, firstName, lastName, email, phone FROM users', [], (err, rows) => {
     if (err) return res.status(500).json({ message: err.message });
-    const users = rows || [];
+    const users = (rows || []).map(normalizeUser);
     if (!users.length) return res.json([]);
     const ids = users.map(u => u.id);
     const placeholders = ids.map(() => '?').join(', ');
@@ -1271,6 +1296,56 @@ app.put('/api/tickets/:id', authMiddleware, (req, res) => {
       }
     );
   });
+});
+
+app.delete('/api/tickets/:id', authMiddleware, adminOnly, async (req, res) => {
+  const ticketId = req.params.id;
+  const queryAll = (sql, params = []) =>
+    new Promise((resolve, reject) => {
+      db.all(sql, params, (err, rows) => {
+        if (err) return reject(err);
+        resolve(rows || []);
+      });
+    });
+  const run = (sql, params = []) =>
+    new Promise((resolve, reject) => {
+      db.run(sql, params, (err) => {
+        if (err) return reject(err);
+        resolve();
+      });
+    });
+
+  try {
+    const attachmentRows = await queryAll('SELECT id, path FROM attachments WHERE ticket_id = ?', [ticketId]);
+    const filePaths = attachmentRows.map((row) => row.path).filter(Boolean);
+    await run('DELETE FROM attachments WHERE ticket_id = ?', [ticketId]);
+    await run('DELETE FROM ticket_comments WHERE ticket_id = ?', [ticketId]);
+    await run('DELETE FROM tickets WHERE id = ?', [ticketId]);
+
+    if (useSupabaseStorage && filePaths.length) {
+      try {
+        await supabase.storage.from(SUPABASE_STORAGE_BUCKET).remove(filePaths);
+      } catch (storageErr) {
+        console.error('Failed to remove ticket attachments from storage:', storageErr?.message || storageErr);
+      }
+    } else {
+      filePaths.forEach((filePath) => {
+        fs.unlink(filePath, () => {});
+      });
+    }
+
+    await logAudit({
+      action: 'ticket_deleted',
+      entityType: 'ticket',
+      entityId: ticketId,
+      actor: { id: req.user?.id, username: req.user?.username, role: req.user?.role },
+      ip: req.ip
+    });
+
+    return res.json({ message: 'Deleted' });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
 });
 
 app.get('/api/tickets/:id/comments', authMiddleware, (req, res) => {
