@@ -42,7 +42,15 @@ app.get('/', (req, res) => {
   res.json({ message: 'HelpDesk API is running' });
 });
 
+app.get('/api', (req, res) => {
+  res.json({ message: 'HelpDesk API is running' });
+});
+
 app.get('/health', (req, res) => {
+  res.json({ ok: true });
+});
+
+app.get('/api/health', (req, res) => {
   res.json({ ok: true });
 });
 
