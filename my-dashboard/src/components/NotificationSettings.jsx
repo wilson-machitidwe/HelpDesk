@@ -40,7 +40,7 @@ const NotificationSettings = () => {
   useEffect(() => {
     const fetchNotificationSettings = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = sessionStorage.getItem('token');
         const res = await fetch(`${API_BASE}/api/notifications/settings`, {
           headers: { Authorization: `Bearer ${token}` }
         });
@@ -88,7 +88,7 @@ const NotificationSettings = () => {
   const saveNotificationSettings = async () => {
     setNotificationMessage('');
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       const res = await fetch(`${API_BASE}/api/notifications/settings`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -108,7 +108,7 @@ const NotificationSettings = () => {
   const sendTestEmail = async () => {
     setNotificationTestMessage('');
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       const res = await fetch(`${API_BASE}/api/notifications/test`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` }
@@ -155,7 +155,7 @@ const NotificationSettings = () => {
                       <label className="inline-flex items-center cursor-pointer">
                         <input type="checkbox" checked={checked} onChange={() => toggleMatrix(row.key, target)} className="sr-only" />
                         <span className={`w-6 h-6 inline-flex items-center justify-center border-2 rounded text-sm font-bold ${checked ? 'border-orange-600 bg-orange-50 text-orange-700' : 'border-gray-400 text-transparent'}`}>
-                          ?
+                          ✓
                         </span>
                       </label>
                     </td>

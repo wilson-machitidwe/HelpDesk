@@ -42,9 +42,9 @@ const buildChurnData = (tickets, days) => {
 const TicketChurnChart = ({ tickets }) => {
   const data = useMemo(() => buildChurnData(tickets || [], 8), [tickets]);
   return (
-    <div className="w-full h-64 bg-white p-4">
+    <div className="w-full h-[22.5rem] bg-white p-4">
       <h3 className="text-sm font-bold text-gray-700 mb-3">Ticket Churn</h3>
-      <ResponsiveContainer width="100%" height="88%">
+      <ResponsiveContainer width="100%" height="90%">
         <BarChart layout="vertical" data={data} margin={{ top: 5, right: 16, left: 16, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#eee" />
           <YAxis dataKey="date" type="category" fontSize={10} tickMargin={8} width={52} />

@@ -16,7 +16,7 @@ const RoleTasksManager = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = sessionStorage.getItem('token');
         const [taskRes, roleRes] = await Promise.all([
           fetch(`${API_BASE}/api/tasks`, { headers: { Authorization: `Bearer ${token}` } }),
           fetch(`${API_BASE}/api/role-tasks`, { headers: { Authorization: `Bearer ${token}` } })
@@ -53,7 +53,7 @@ const RoleTasksManager = () => {
   const saveRoleTasks = async () => {
     setMessage('');
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       const res = await fetch(`${API_BASE}/api/role-tasks`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -107,7 +107,7 @@ const RoleTasksManager = () => {
                           className="sr-only"
                         />
                         <span className={`w-6 h-6 inline-flex items-center justify-center border-2 rounded text-sm font-bold ${checked ? 'border-orange-600 bg-orange-50 text-orange-700' : 'border-gray-400 text-transparent'}`}>
-                          ?
+                          ✓
                         </span>
                       </label>
                     </td>

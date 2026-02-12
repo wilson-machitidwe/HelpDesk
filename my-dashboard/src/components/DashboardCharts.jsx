@@ -9,7 +9,7 @@ const DashboardCharts = ({ refreshKey, hasTask }) => {
 
   useEffect(() => {
     const fetchTickets = async () => {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       const response = await fetch(`${API_BASE}/api/tickets`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -49,34 +49,34 @@ const DashboardCharts = ({ refreshKey, hasTask }) => {
   const noWidgets = !showHistory && !showChurn && !showFirstResponse && !showCloseTime && !showCategory && !showCreators;
 
   return (
-    <div className="grid grid-cols-1 xl:grid-cols-5 gap-5 mt-6 px-6">
+    <div className="grid grid-cols-5 xl:grid-cols-5 gap-5 mt-2 px-6">
       <div className="xl:col-span-3 space-y-5">
         {showHistory && (
-          <div className="bg-white rounded-md border border-gray-200 shadow-sm overflow-hidden">
+          <div className="bg-white rounded-md border border-gray-300 shadow-sm overflow-hidden">
             <TicketHistoryChart tickets={tickets} />
           </div>
         )}
         {showChurn && (
-          <div className="bg-white rounded-md border border-gray-200 shadow-sm overflow-hidden">
+          <div className="bg-white rounded-md border border-gray-300 shadow-sm overflow-hidden">
             <TicketChurnChart tickets={tickets} />
           </div>
         )}
       </div>
 
       <div className="xl:col-span-2 space-y-5">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           {showFirstResponse && (
-            <div className="bg-white p-4 rounded-md border border-gray-200 shadow-sm">
-              <h4 className="text-xs font-bold text-gray-500 uppercase">First Response Time</h4>
-              <p className="text-2xl text-gray-400 font-light mt-1">--</p>
-              <p className="text-[10px] text-gray-400 uppercase">Average</p>
+            <div className="bg-white p-3 rounded-md border border-gold-200 shadow-sm">
+              <h4 className="text-[17px] font-bold text-gold-500 proper">First Response Time</h4>
+              <p className="text-4xl text-gray-400 font-red mt-1">----</p>
+              <p className="text-[17px] font-bold text-blue-400 proper">Average</p>
             </div>
           )}
           {showCloseTime && (
-            <div className="bg-white p-4 rounded-md border border-gray-200 shadow-sm">
-              <h4 className="text-xs font-bold text-gray-500 uppercase">Tickets Close Time</h4>
-              <p className="text-2xl text-gray-400 font-light mt-1">--</p>
-              <p className="text-[10px] text-gray-400 uppercase">Average</p>
+            <div className="bg-white p-2 rounded-md border border-gray-200 shadow-sm">
+              <h4 className="text-[17px] font-bold text-gold-500 proper">Tickets Close Time</h4>
+              <p className="text-4xl text-gray-400 font-red mt-1">----</p>
+              <p className="text-[17px] font-bold text-blue-400 proper">Average</p>
             </div>
           )}
         </div>

@@ -14,7 +14,7 @@ const DashboardTopRow = ({ refreshKey, hasTask, profile }) => {
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = sessionStorage.getItem('token');
         const response = await fetch(`${API_BASE}/api/tickets`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
@@ -55,7 +55,7 @@ const DashboardTopRow = ({ refreshKey, hasTask, profile }) => {
   if (loading) return <div className="p-6 text-gray-500">Loading Stats...</div>;
 
   return (
-    <div className="p-6 bg-gray-50">
+    <div className="px-6 pt-3 pb-4 bg-gray-50">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {hasTask?.('View New Tickets Stat') && (
           <StatCard title="New Tickets" count={stats.newTickets} trendValue={stats.newTickets} trendDirection="up" />

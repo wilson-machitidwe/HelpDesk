@@ -11,7 +11,7 @@ import ReportsPage from './components/ReportsPage';
 
 const loadProfile = () => {
   try {
-    const raw = localStorage.getItem('profile');
+    const raw = sessionStorage.getItem('profile');
     return raw ? JSON.parse(raw) : null;
   } catch (err) {
     return null;
@@ -19,7 +19,7 @@ const loadProfile = () => {
 };
 
 function App() {
-  const [token, setToken] = useState(localStorage.getItem('token'));
+  const [token, setToken] = useState(sessionStorage.getItem('token'));
   const [view, setView] = useState('dashboard');
   const [profile, setProfile] = useState(loadProfile);
   const [showNewTicket, setShowNewTicket] = useState(false);
@@ -52,16 +52,16 @@ function App() {
     setShowNewTicket(false);
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('username');
-    localStorage.removeItem('profile');
+  const handleLogout = React.useCallback(() => {
+    sessionStorage.removeItem('token');
+    sessionStorage.removeItem('username');
+    sessionStorage.removeItem('profile');
     setToken(null);
     setProfile(null);
     setView('dashboard');
     setSelectedTicket(null);
     setShowNewTicket(false);
-  };
+  }, []);
 
   const handleOpenNewTicket = () => {
     setTicketMessage('');
@@ -149,7 +149,7 @@ function App() {
         return;
       }
       const updatedProfile = { ...profile, mustChangePassword: false };
-      localStorage.setItem('profile', JSON.stringify(updatedProfile));
+      sessionStorage.setItem('profile', JSON.stringify(updatedProfile));
       setProfile(updatedProfile);
       setPasswordForm({ password: '', confirm: '' });
       setShowPasswordPrompt(false);
@@ -173,6 +173,26 @@ function App() {
       setView(allowedViews[0] || 'dashboard');
     }
   }, [profile?.role, userTasks.length]);
+
+  const idleTimerRef = React.useRef(null);
+
+  React.useEffect(() => {
+    if (!token) return undefined;
+    const timeoutMs = 10 * 60 * 1000;
+    const events = ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart'];
+    const resetIdleTimer = () => {
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+      idleTimerRef.current = setTimeout(() => {
+        handleLogout();
+      }, timeoutMs);
+    };
+    resetIdleTimer();
+    events.forEach((event) => window.addEventListener(event, resetIdleTimer));
+    return () => {
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+      events.forEach((event) => window.removeEventListener(event, resetIdleTimer));
+    };
+  }, [token, handleLogout]);
 
   React.useEffect(() => {
     const fetchCategories = async () => {
@@ -222,25 +242,25 @@ function App() {
         <Login onLoginSuccess={handleLoginSuccess} />
       ) : (
         <div className="min-h-screen bg-gray-100 pb-10">
-          <nav className="bg-white border-b border-gray-200 px-6 py-4 mb-6 flex items-center justify-between shadow-sm">
+          <nav className="bg-white border-b border-gray-200 px-6 py-4 mb-3 flex items-center justify-between shadow-sm">
             <div className="flex items-center gap-4">
-              <span className="text-2xl font-bold text-orange-600 tracking-tighter">Namikango Mission Help Desk</span>
+              <span className="text-[20px] font-bold text-orange-600 tracking-tighter">Namikango Mission Help Desk</span>
               <div className="h-6 w-px bg-gray-300 mx-2"></div>
               <div className="flex gap-6">
                 {hasTask('View Dashboard') && (
-                  <button onClick={() => setView('dashboard')} className={`text-base font-bold proper ${view === 'dashboard' ? 'text-orange-600 border-b-2 border-orange-600' : 'text-gray-500 hover:text-orange-400'}`}>Dashboard</button>
+                  <button onClick={() => setView('dashboard')} className={`text-[16px] font-bold proper ${view === 'dashboard' ? 'text-orange-600 border-b-2 border-orange-600' : 'text-gray-500 hover:text-orange-400'}`}>Dashboard</button>
                 )}
                 {hasTask('View Tickets Page') && (
-                  <button onClick={() => setView('tickets')} className={`text-base font-bold proper ${view === 'tickets' ? 'text-orange-600 border-b-2 border-orange-600' : 'text-gray-500 hover:text-orange-400'}`}>Tickets</button>
+                  <button onClick={() => setView('tickets')} className={`text-[16px] font-bold proper ${view === 'tickets' ? 'text-orange-600 border-b-2 border-orange-600' : 'text-gray-500 hover:text-orange-400'}`}>Tickets</button>
                 )}
                 {hasTask('View Users Page') && (
-                  <button onClick={() => setView('users')} className={`text-base font-bold proper ${view === 'users' ? 'text-orange-600 border-b-2 border-orange-600' : 'text-gray-500 hover:text-orange-400'}`}>Users</button>
+                  <button onClick={() => setView('users')} className={`text-[16px] font-bold proper ${view === 'users' ? 'text-orange-600 border-b-2 border-orange-600' : 'text-gray-500 hover:text-orange-400'}`}>Users</button>
                 )}
                 {canViewReports && (
-                  <button onClick={() => setView('reports')} className={`text-base font-bold proper ${view === 'reports' ? 'text-orange-600 border-b-2 border-orange-600' : 'text-gray-500 hover:text-orange-400'}`}>Reports</button>
+                  <button onClick={() => setView('reports')} className={`text-[16px] font-bold proper ${view === 'reports' ? 'text-orange-600 border-b-2 border-orange-600' : 'text-gray-500 hover:text-orange-400'}`}>Reports</button>
                 )}
                 {canViewConfig && (
-                  <button onClick={() => setView('config')} className={`text-base font-bold proper inline-flex items-center gap-2 ${view === 'config' ? 'text-orange-600 border-b-2 border-orange-600' : 'text-gray-500 hover:text-orange-400'}`}>
+                  <button onClick={() => setView('config')} className={`text-[16px] font-bold proper inline-flex items-center gap-2 ${view === 'config' ? 'text-orange-600 border-b-2 border-orange-600' : 'text-gray-500 hover:text-orange-400'}`}>
                     <svg viewBox="0 0 24 24" className="w-4 h-4" aria-hidden="true">
                       <path
                         d="M19.14 12.94a7.97 7.97 0 0 0 .06-.94 7.97 7.97 0 0 0-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.46 7.46 0 0 0-1.63-.94l-.36-2.54a.5.5 0 0 0-.5-.42h-3.84a.5.5 0 0 0-.5.42l-.36 2.54c-.58.23-1.13.54-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.7 8.84a.5.5 0 0 0 .12.64l2.03 1.58c-.04.31-.06.62-.06.94 0 .32.02.63.06.94L2.82 14.52a.5.5 0 0 0-.12.64l1.92 3.32a.5.5 0 0 0 .6.22l2.39-.96c.5.4 1.05.72 1.63.94l.36 2.54a.5.5 0 0 0 .5.42h3.84a.5.5 0 0 0 .5-.42l.36-2.54c.58-.23 1.13-.54 1.63-.94l2.39.96a.5.5 0 0 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58ZM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Z"
@@ -256,16 +276,16 @@ function App() {
               {hasTask('Create Tickets') && (
                 <button
                   onClick={handleOpenNewTicket}
-                  className="bg-orange-600 text-white px-3 py-1.5 rounded text-sm font-bold proper hover:bg-orange-700 transition-all"
+                  className="text-[16px] bg-orange-600 text-white px-3 py-1.5 rounded text-sm font-bold proper hover:bg-orange-700 transition-all"
                 >
                  + New Ticket
                 </button>
               )}
-              <div className="text-sm font-bold text-gray-700">{displayName}</div>
+              <div className="text-[16px] font-bold text-gray-700">{displayName}</div>
             
               <button 
                 onClick={handleLogout} 
-                className="bg-gray-50 hover:bg-orange-600 hover:text-white text-gray-600 border border-gray-300 px-4 py-1.5 rounded text-sm font-bold proper transition-all"
+                className="text-[16px] bg-gray-50 hover:bg-orange-600 hover:text-white text-gray-600 border border-gray-300 px-4 py-1.5 rounded text-sm font-bold proper transition-all"
               >
                 Logout
               </button>

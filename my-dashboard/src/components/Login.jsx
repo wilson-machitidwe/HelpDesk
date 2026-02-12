@@ -22,11 +22,11 @@ const Login = ({ onLoginSuccess }) => {
       const data = await response.json();
 
       if (response.ok) {
-        localStorage.setItem('token', data.token);
+        sessionStorage.setItem('token', data.token);
 
         if (data.user) {
-          localStorage.setItem('username', data.user.username || 'User');
-          localStorage.setItem('profile', JSON.stringify({
+          sessionStorage.setItem('username', data.user.username || 'User');
+          sessionStorage.setItem('profile', JSON.stringify({
             id: data.user.id,
             username: data.user.username,
             role: data.user.role,
@@ -38,8 +38,8 @@ const Login = ({ onLoginSuccess }) => {
             tasks: data.user.tasks || [],
           }));
         } else {
-          localStorage.setItem('username', 'User');
-          localStorage.setItem('profile', JSON.stringify({ username: 'User' }));
+          sessionStorage.setItem('username', 'User');
+          sessionStorage.setItem('profile', JSON.stringify({ username: 'User' }));
         }
 
         onLoginSuccess(data.token, data.user);
