@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { apiFetchJson } from '../config/apiBase';
+import { API_BASE } from '../config/apiBase';
 
 const ReportsPage = ({ profile }) => {
   const [message, setMessage] = useState('');
@@ -18,12 +18,23 @@ const ReportsPage = ({ profile }) => {
 
   const canAccessAudit = profile?.role === 'Admin' || profile?.role === 'Manager';
 
+  const requestJson = async (path, options = {}) => {
+    try {
+      const response = await fetch(`${API_BASE}${path}`, options);
+      const contentType = (response.headers.get('content-type') || '').toLowerCase();
+      const data = contentType.includes('application/json') ? await response.json() : {};
+      return { ok: response.ok, data };
+    } catch (error) {
+      return { ok: false, data: {} };
+    }
+  };
+
   const handlePullReports = async () => {
     setMessage('');
     setReportSubmitting(true);
     try {
       const token = sessionStorage.getItem('token');
-      const res = await apiFetchJson('/api/reports/run', {
+      const res = await requestJson('/api/reports/run', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ type: reportType, from: reportFrom || null, to: reportTo || null })
@@ -56,7 +67,7 @@ const ReportsPage = ({ profile }) => {
     setAuditSubmitting(true);
     try {
       const token = sessionStorage.getItem('token');
-      const res = await apiFetchJson('/api/audit/run', {
+      const res = await requestJson('/api/audit/run', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ from: auditFrom || null, to: auditTo || null })
