@@ -42,6 +42,7 @@ function App() {
   const [passwordForm, setPasswordForm] = useState({ password: '', confirm: '' });
   const [passwordMessage, setPasswordMessage] = useState('');
   const [passwordSubmitting, setPasswordSubmitting] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   const handleLoginSuccess = (newToken, user) => {
     setToken(newToken);
@@ -174,6 +175,10 @@ function App() {
     }
   }, [profile?.role, userTasks.length]);
 
+  React.useEffect(() => {
+    setMobileNavOpen(false);
+  }, [view]);
+
   const idleTimerRef = React.useRef(null);
 
   React.useEffect(() => {
@@ -242,11 +247,22 @@ function App() {
         <Login onLoginSuccess={handleLoginSuccess} />
       ) : (
         <div className="min-h-screen bg-gray-100 pb-10">
-          <nav className="bg-white border-b border-gray-200 px-6 py-4 mb-3 flex items-center justify-between shadow-sm">
-            <div className="flex items-center gap-4">
-              <span className="text-[20px] font-bold text-orange-600 tracking-tighter">Namikango Mission Help Desk</span>
-              <div className="h-6 w-px bg-gray-300 mx-2"></div>
-              <div className="flex gap-6">
+          <nav className="bg-white border-b border-gray-200 px-4 md:px-6 py-3 mb-3 shadow-sm">
+            <div className="md:hidden flex items-center justify-between gap-3">
+              <span className="text-[18px] font-bold text-orange-600 tracking-tighter">Namikango Mission Help Desk</span>
+              <button
+                type="button"
+                className="md:hidden inline-flex items-center justify-center h-9 w-9 rounded border border-gray-300 text-gray-600"
+                onClick={() => setMobileNavOpen((prev) => !prev)}
+                aria-label="Toggle navigation"
+              >
+                {mobileNavOpen ? 'X' : '='}
+              </button>
+            </div>
+
+            <div className="hidden md:flex items-center gap-6 flex-nowrap whitespace-nowrap overflow-x-auto">
+              <span className="shrink-0 text-[20px] font-bold text-orange-600 tracking-tighter">Namikango Mission Help Desk</span>
+              <div className="flex items-center gap-6 shrink-0">
                 {hasTask('View Dashboard') && (
                   <button onClick={() => setView('dashboard')} className={`text-[16px] font-bold proper ${view === 'dashboard' ? 'text-orange-600 border-b-2 border-orange-600' : 'text-gray-500 hover:text-orange-400'}`}>Dashboard</button>
                 )}
@@ -270,26 +286,50 @@ function App() {
                     Config
                   </button>
                 )}
-          </div>
-        </div>
-            <div className="flex items-center gap-2">
-              {hasTask('Create Tickets') && (
+              </div>
+              <div className="ml-auto flex items-center gap-2 shrink-0">
+                {hasTask('Create Tickets') && (
+                  <button
+                    onClick={handleOpenNewTicket}
+                    className="text-[16px] bg-orange-600 text-white px-3 py-1.5 rounded text-sm font-bold proper hover:bg-orange-700 transition-all"
+                  >
+                    + New Ticket
+                  </button>
+                )}
+                <div className="text-[16px] font-bold text-gray-700">{displayName}</div>
                 <button
-                  onClick={handleOpenNewTicket}
-                  className="text-[16px] bg-orange-600 text-white px-3 py-1.5 rounded text-sm font-bold proper hover:bg-orange-700 transition-all"
+                  onClick={handleLogout}
+                  className="text-[16px] bg-gray-50 hover:bg-orange-600 hover:text-white text-gray-600 border border-gray-300 px-4 py-1.5 rounded text-sm font-bold proper transition-all"
                 >
-                 + New Ticket
+                  Logout
                 </button>
-              )}
-              <div className="text-[16px] font-bold text-gray-700">{displayName}</div>
-            
-              <button 
-                onClick={handleLogout} 
-                className="text-[16px] bg-gray-50 hover:bg-orange-600 hover:text-white text-gray-600 border border-gray-300 px-4 py-1.5 rounded text-sm font-bold proper transition-all"
-              >
-                Logout
-              </button>
+              </div>
             </div>
+
+            {mobileNavOpen && (
+              <div className="md:hidden mt-3 border-t border-gray-200 pt-3 space-y-2">
+                {hasTask('View Dashboard') && (
+                  <button onClick={() => setView('dashboard')} className={`block w-full text-left px-3 py-2 rounded text-sm font-bold ${view === 'dashboard' ? 'bg-orange-50 text-orange-600' : 'text-gray-700'}`}>Dashboard</button>
+                )}
+                {hasTask('View Tickets Page') && (
+                  <button onClick={() => setView('tickets')} className={`block w-full text-left px-3 py-2 rounded text-sm font-bold ${view === 'tickets' ? 'bg-orange-50 text-orange-600' : 'text-gray-700'}`}>Tickets</button>
+                )}
+                {hasTask('View Users Page') && (
+                  <button onClick={() => setView('users')} className={`block w-full text-left px-3 py-2 rounded text-sm font-bold ${view === 'users' ? 'bg-orange-50 text-orange-600' : 'text-gray-700'}`}>Users</button>
+                )}
+                {canViewReports && (
+                  <button onClick={() => setView('reports')} className={`block w-full text-left px-3 py-2 rounded text-sm font-bold ${view === 'reports' ? 'bg-orange-50 text-orange-600' : 'text-gray-700'}`}>Reports</button>
+                )}
+                {canViewConfig && (
+                  <button onClick={() => setView('config')} className={`block w-full text-left px-3 py-2 rounded text-sm font-bold ${view === 'config' ? 'bg-orange-50 text-orange-600' : 'text-gray-700'}`}>Config</button>
+                )}
+                {hasTask('Create Tickets') && (
+                  <button onClick={handleOpenNewTicket} className="block w-full text-left px-3 py-2 rounded text-sm font-bold bg-orange-600 text-white">+ New Ticket</button>
+                )}
+                <div className="px-3 py-1 text-sm font-bold text-gray-600">{displayName}</div>
+                <button onClick={handleLogout} className="block w-full text-left px-3 py-2 rounded text-sm font-bold border border-gray-300 text-gray-700">Logout</button>
+              </div>
+            )}
           </nav>
 
           <main className="max-w-screen-2xl mx-auto">

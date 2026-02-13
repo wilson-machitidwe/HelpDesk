@@ -99,8 +99,10 @@ const dbReady = db?.ready || Promise.resolve();
 function readUserField(user, key) {
   if (!user) return undefined;
   const lower = key.toLowerCase();
+  const snake = key.replace(/[A-Z]/g, (m) => `_${m.toLowerCase()}`);
   if (Object.prototype.hasOwnProperty.call(user, key)) return user[key];
   if (Object.prototype.hasOwnProperty.call(user, lower)) return user[lower];
+  if (Object.prototype.hasOwnProperty.call(user, snake)) return user[snake];
   return undefined;
 }
 
@@ -111,13 +113,40 @@ function normalizeUser(user) {
     id: user.id ?? readUserField(user, 'id'),
     username: user.username ?? readUserField(user, 'username'),
     role: user.role ?? readUserField(user, 'role'),
-    password: user.password ?? readUserField(user, 'password'),
+    password: user.password ?? readUserField(user, 'password') ?? readUserField(user, 'passwordHash'),
     firstName: readUserField(user, 'firstName') || '',
     lastName: readUserField(user, 'lastName') || '',
     email: readUserField(user, 'email') || '',
     phone: readUserField(user, 'phone') || '',
     isSuper: !!Number(readUserField(user, 'isSuper')),
     mustChangePassword: !!Number(readUserField(user, 'mustChangePassword'))
+  };
+}
+
+function readTicketField(ticket, key) {
+  if (!ticket) return undefined;
+  const lower = key.toLowerCase();
+  const snake = key.replace(/[A-Z]/g, (m) => `_${m.toLowerCase()}`);
+  if (Object.prototype.hasOwnProperty.call(ticket, key)) return ticket[key];
+  if (Object.prototype.hasOwnProperty.call(ticket, lower)) return ticket[lower];
+  if (Object.prototype.hasOwnProperty.call(ticket, snake)) return ticket[snake];
+  return undefined;
+}
+
+function normalizeTicket(ticket) {
+  if (!ticket) return null;
+  return {
+    ...ticket,
+    id: readTicketField(ticket, 'id'),
+    department: readTicketField(ticket, 'department') || 'Support',
+    summary: readTicketField(ticket, 'summary') || '',
+    description: readTicketField(ticket, 'description') || '',
+    creator: readTicketField(ticket, 'creator') || '',
+    status: readTicketField(ticket, 'status') || 'Open',
+    priority: readTicketField(ticket, 'priority') || 'Medium',
+    category: readTicketField(ticket, 'category') || '',
+    assignee: readTicketField(ticket, 'assignee') || '',
+    createdAt: readTicketField(ticket, 'createdAt')
   };
 }
 
@@ -175,7 +204,7 @@ function seedAdminUser() {
             admin.isSuper ? 1 : 0,
             admin.firstName || 'System',
             admin.lastName || 'Admin',
-            admin.email || 'admin@example.com',
+            admin.email || 'namikango.helpdesk@gmail.com',
             admin.phone || '000-000-0000',
             0
           ],
@@ -639,14 +668,90 @@ async function sendTicketNotification(type, ticket, actor, extra = {}) {
   });
 }
 
-function getAttachmentUrl({ storedName, path: storedPath }) {
-  if (useSupabaseStorage && storedPath) {
-    const { data } = supabase.storage.from(SUPABASE_STORAGE_BUCKET).getPublicUrl(storedPath);
-    return data?.publicUrl || null;
-  }
-  if (storedName) return `/uploads/${storedName}`;
-  return null;
+function getAttachmentUrl({ id }) {
+  if (id == null) return null;
+  return `/api/attachments/${id}/download`;
 }
+
+function canUserAccessTicketByRole(ticket, reqUser, displayName) {
+  if (!ticket) return false;
+  const role = reqUser?.role;
+  const username = reqUser?.username || '';
+  if (role === 'User') {
+    return ticket.creator === username || ticket.creator === displayName;
+  }
+  if (role === 'Technician') {
+    return !ticket.assignee || ticket.assignee === username;
+  }
+  return true;
+}
+
+async function resolveDisplayName(username) {
+  return getDisplayNameFor(username).catch(() => username);
+}
+
+async function streamAttachmentToResponse(row, res) {
+  if (!row) {
+    res.status(404).json({ message: 'Attachment not found' });
+    return;
+  }
+
+  if (useSupabaseStorage) {
+    if (!row.path) {
+      res.status(404).json({ message: 'Attachment file not found' });
+      return;
+    }
+    const { data, error } = await supabase.storage.from(SUPABASE_STORAGE_BUCKET).download(row.path);
+    if (error || !data) {
+      res.status(404).json({ message: 'Attachment file not found' });
+      return;
+    }
+    const arrayBuffer = await data.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    if (row.mime) res.setHeader('Content-Type', row.mime);
+    if (row.original_name) res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(row.original_name)}"`);
+    res.send(buffer);
+    return;
+  }
+
+  if (!row.path || !fs.existsSync(row.path)) {
+    res.status(404).json({ message: 'Attachment file not found' });
+    return;
+  }
+  if (row.mime) res.setHeader('Content-Type', row.mime);
+  res.download(row.path, row.original_name || undefined);
+}
+
+app.get('/api/attachments/:id/download', authMiddleware, async (req, res) => {
+  const attachmentId = req.params.id;
+  const username = req.user?.username || '';
+  try {
+    const attachmentRow = await new Promise((resolve, reject) => {
+      db.get('SELECT * FROM attachments WHERE id = ?', [attachmentId], (err, row) => {
+        if (err) return reject(err);
+        resolve(row || null);
+      });
+    });
+    if (!attachmentRow) return res.status(404).json({ message: 'Attachment not found' });
+
+    const ticketRow = await new Promise((resolve, reject) => {
+      db.get('SELECT * FROM tickets WHERE id = ?', [attachmentRow.ticket_id], (err, row) => {
+        if (err) return reject(err);
+        resolve(row || null);
+      });
+    });
+    if (!ticketRow) return res.status(404).json({ message: 'Ticket not found' });
+
+    const displayName = await resolveDisplayName(username);
+    if (!canUserAccessTicketByRole(ticketRow, req.user, displayName)) {
+      return res.status(403).json({ message: 'Not authorized to access this attachment' });
+    }
+
+    return streamAttachmentToResponse(attachmentRow, res);
+  } catch (err) {
+    return res.status(500).json({ message: err.message || 'Failed to load attachment' });
+  }
+});
 
 async function saveAttachment({ ticketId, commentId = null, file, uploader }) {
   if (!file) return;
@@ -742,12 +847,18 @@ function findUserById(userId) {
   });
 }
 
-async function sendWelcomeEmail({ to, username, password }) {
+async function sendWelcomeEmail({ to, username, password, firstName, lastName }) {
   const transporter = getMailer();
   const from = SMTP_FROM || SMTP_USER;
   if (!transporter || !from) return;
+  const displayName = [firstName, lastName].filter(Boolean).join(' ') || username || 'User';
+  const appUrl =
+    process.env.APP_URL ||
+    process.env.FRONTEND_URL ||
+    process.env.CLIENT_URL ||
+    'http://localhost:5173';
   const text = [
-    'Hello,',
+    `Hello ${displayName},`,
     '',
     'Your Help Desk account has been created.',
     `Username: ${username}`,
@@ -755,7 +866,8 @@ async function sendWelcomeEmail({ to, username, password }) {
     '',
     'Please log in and change your password immediately.',
     '',
-    'Namikango Mission Help Desk'
+    'Namikango Mission Help Desk',
+    `App URL: ${appUrl}`
   ].join('\n');
   await transporter.sendMail({
     from,
@@ -769,7 +881,8 @@ app.post('/api/auth/login', async (req, res) => {
   const { username, password } = req.body || {};
   try {
     const user = await findUserByUsername(username);
-    if (!user || !bcrypt.compareSync(password, user.password)) {
+    const hashedPassword = user?.password;
+    if (!user || !hashedPassword || !bcrypt.compareSync(password, hashedPassword)) {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
@@ -874,11 +987,19 @@ app.post('/api/reports/run', authMiddleware, managerOrAdmin, (req, res) => {
     const { filters, params } = buildDateFilters('createdAt', from, to);
     const where = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
     db.all(
-      `SELECT status, COUNT(*) as count
+      `SELECT
+         id,
+         createdAt as date_created,
+         NULL as date_closed,
+         creator,
+         department,
+         category,
+         priority,
+         summary,
+         assignee
        FROM tickets
       ${where}
-       GROUP BY status
-       ORDER BY count DESC`,
+       ORDER BY id DESC`,
       params,
       (err, rows) => {
         if (err) return res.status(500).json({ message: err.message });
@@ -1018,7 +1139,7 @@ app.post('/api/audit/run', authMiddleware, managerOrAdmin, (req, res) => {
 });
 
 app.get('/api/users', authMiddleware, (req, res) => {
-  db.all('SELECT id, username, role, isSuper, firstName, lastName, email, phone FROM users', [], (err, rows) => {
+  db.all('SELECT * FROM users', [], (err, rows) => {
     if (err) return res.status(500).json({ message: err.message });
     const users = (rows || []).map(normalizeUser);
     if (!users.length) return res.json([]);
@@ -1074,7 +1195,7 @@ app.post('/api/users', authMiddleware, (req, res) => {
         });
       };
       if (email) {
-        sendWelcomeEmail({ to: email, username, password }).catch((mailErr) => {
+        sendWelcomeEmail({ to: email, username, password, firstName, lastName }).catch((mailErr) => {
           console.error('Email send failed:', mailErr.message || mailErr);
         });
       }
@@ -1183,7 +1304,7 @@ app.get('/api/tickets', authMiddleware, (req, res) => {
           [username, displayName],
           (err, rows) => {
             if (err) return res.status(500).json({ message: err.message });
-            res.json(rows || []);
+            res.json((rows || []).map(normalizeTicket));
           }
         );
       })
@@ -1191,32 +1312,33 @@ app.get('/api/tickets', authMiddleware, (req, res) => {
   }
   db.all('SELECT * FROM tickets', [], (err, rows) => {
     if (err) return res.status(500).json({ message: err.message });
-    res.json(rows || []);
+    res.json((rows || []).map(normalizeTicket));
   });
 });
 
-app.get('/api/tickets/:id', authMiddleware, (req, res) => {
+app.get('/api/tickets/:id(\\d+)', authMiddleware, (req, res) => {
   const role = req.user?.role;
   const username = req.user?.username || '';
   const fetchAndRespond = (displayName) => {
     db.get('SELECT * FROM tickets WHERE id = ?', [req.params.id], (err, row) => {
       if (err) return res.status(500).json({ message: err.message });
       if (!row) return res.status(404).json({ message: 'Ticket not found' });
+      const normalizedTicket = normalizeTicket(row);
       if (role === 'User' && row.creator !== username && row.creator !== displayName) {
         return res.status(403).json({ message: 'Not authorized to view this ticket' });
       }
       db.all('SELECT * FROM attachments WHERE ticket_id = ? AND comment_id IS NULL', [row.id], (aErr, attachments) => {
-        if (aErr) return res.json(row);
+        if (aErr) return res.json(normalizedTicket);
         const mapped = (attachments || []).map((a) => ({
           id: a.id,
           originalName: a.original_name,
           size: a.size,
           mime: a.mime,
-          url: getAttachmentUrl({ storedName: a.stored_name, path: a.path }),
-          createdAt: a.createdAt,
+          url: getAttachmentUrl({ id: a.id }),
+          createdAt: a.createdAt || a.createdat || a.created_at,
           uploader: a.uploader
         }));
-        res.json({ ...row, attachments: mapped });
+        res.json({ ...normalizedTicket, attachments: mapped });
       });
     });
   };
@@ -1419,13 +1541,17 @@ app.get('/api/tickets/:id/comments', authMiddleware, (req, res) => {
                   originalName: a.original_name,
                   size: a.size,
                   mime: a.mime,
-                  url: getAttachmentUrl({ storedName: a.stored_name, path: a.path }),
-                  createdAt: a.createdAt,
+                  url: getAttachmentUrl({ id: a.id }),
+                  createdAt: a.createdAt || a.createdat || a.created_at,
                   uploader: a.uploader
                 });
                 map.set(a.comment_id, list);
               });
-              res.json(comments.map((c) => ({ ...c, attachments: map.get(c.id) || [] })));
+              res.json(comments.map((c) => ({
+                ...c,
+                createdAt: c.createdAt || c.createdat || c.created_at,
+                attachments: map.get(c.id) || []
+              })));
             }
           );
         }
@@ -1447,42 +1573,46 @@ app.post('/api/tickets/:id/comments', authMiddleware, maybeUploadSingle('attachm
   const username = req.user?.username || '';
   const { body } = req.body || {};
   if (!body || !body.trim()) return res.status(400).json({ message: 'Comment is required' });
-  db.get('SELECT * FROM tickets WHERE id = ?', [req.params.id], (err, ticket) => {
-    if (err) return res.status(500).json({ message: err.message });
-    if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
-    if (role === 'User' && ticket.creator !== username) {
-      return res.status(403).json({ message: 'Not authorized to comment on this ticket' });
-    }
-    if (role === 'Technician' && ticket.assignee !== username) {
-      return res.status(403).json({ message: 'Not authorized to comment on this ticket' });
-    }
-    const createdAt = new Date().toISOString();
-    db.run(
-      `INSERT INTO ticket_comments (ticket_id, author, body, createdAt)
-       VALUES (?, ?, ?, ?)
-       RETURNING id`,
-      [req.params.id, username, body.trim(), createdAt],
-      function (cErr) {
-        if (cErr) return res.status(500).json({ message: cErr.message });
-        if (req.file) {
-          saveAttachment({ ticketId: req.params.id, commentId: this.lastID, file: req.file, uploader: username })
-            .catch((uploadErr) => console.error('Attachment save error:', uploadErr?.message || uploadErr));
+  getDisplayNameFor(username)
+    .then((displayName) => {
+      db.get('SELECT * FROM tickets WHERE id = ?', [req.params.id], (err, ticket) => {
+        if (err) return res.status(500).json({ message: err.message });
+        if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
+        if (role === 'User' && ticket.creator !== username && ticket.creator !== displayName) {
+          return res.status(403).json({ message: 'Not authorized to comment on this ticket' });
         }
-        sendTicketNotification('commented', ticket, username, { comment: body.trim() })
-          .catch((mailErr) => console.error('Notification error:', mailErr.message || mailErr));
-        logAudit({
-          action: 'ticket_commented',
-          entityType: 'ticket',
-          entityId: req.params.id,
-          actor: { id: req.user?.id, username: req.user?.username, role: req.user?.role },
-          detail: { commentId: this.lastID },
-          ip: req.ip
-        }).then(() => {
-          res.json({ id: this.lastID, message: 'Comment added' });
-        });
-      }
-    );
-  });
+        if (role === 'Technician' && ticket.assignee !== username) {
+          return res.status(403).json({ message: 'Not authorized to comment on this ticket' });
+        }
+        const createdAt = new Date().toISOString();
+        db.run(
+          `INSERT INTO ticket_comments (ticket_id, author, body, createdAt)
+           VALUES (?, ?, ?, ?)
+           RETURNING id`,
+          [req.params.id, username, body.trim(), createdAt],
+          function (cErr) {
+            if (cErr) return res.status(500).json({ message: cErr.message });
+            if (req.file) {
+              saveAttachment({ ticketId: req.params.id, commentId: this.lastID, file: req.file, uploader: username })
+                .catch((uploadErr) => console.error('Attachment save error:', uploadErr?.message || uploadErr));
+            }
+            sendTicketNotification('commented', ticket, username, { comment: body.trim() })
+              .catch((mailErr) => console.error('Notification error:', mailErr.message || mailErr));
+            logAudit({
+              action: 'ticket_commented',
+              entityType: 'ticket',
+              entityId: req.params.id,
+              actor: { id: req.user?.id, username: req.user?.username, role: req.user?.role },
+              detail: { commentId: this.lastID },
+              ip: req.ip
+            }).then(() => {
+              res.json({ id: this.lastID, message: 'Comment added' });
+            });
+          }
+        );
+      });
+    })
+    .catch((nameErr) => res.status(500).json({ message: nameErr.message }));
 });
 
 app.delete('/api/attachments/:id', authMiddleware, adminOnly, (req, res) => {
@@ -1518,11 +1648,11 @@ app.get('/api/tickets/stats', authMiddleware, (req, res) => {
   const role = req.user?.role;
   const baseSql = `
     SELECT
-      COUNT(*) as totalCount,
-      SUM(CASE WHEN status IS NULL OR status = '' OR LOWER(status) != 'closed' THEN 1 ELSE 0 END) as openCount,
-      SUM(CASE WHEN assignee IS NULL OR assignee = '' THEN 1 ELSE 0 END) as unassignedCount,
-      SUM(CASE WHEN creator = ? OR creator = ? THEN 1 ELSE 0 END) as yourCount,
-      SUM(CASE WHEN createdAt >= NOW() - INTERVAL '7 days' THEN 1 ELSE 0 END) as newCount
+      COUNT(*) as total_count,
+      SUM(CASE WHEN status IS NULL OR status = '' OR LOWER(status) != 'closed' THEN 1 ELSE 0 END) as open_count,
+      SUM(CASE WHEN assignee IS NULL OR assignee = '' THEN 1 ELSE 0 END) as unassigned_count,
+      SUM(CASE WHEN creator = ? OR creator = ? THEN 1 ELSE 0 END) as your_count,
+      SUM(CASE WHEN createdAt >= NOW() - INTERVAL '7 days' THEN 1 ELSE 0 END) as new_count
     FROM tickets
   `;
   findUserByUsername(username)
@@ -1535,10 +1665,10 @@ app.get('/api/tickets/stats', authMiddleware, (req, res) => {
       db.get(sql, params, (err, row) => {
         if (err) return res.status(500).json({ message: err.message });
         res.json({
-          newCount: row?.newCount || 0,
-          yourCount: row?.yourCount || 0,
-          openCount: row?.openCount || 0,
-          unassignedCount: row?.unassignedCount || 0
+          newCount: row?.new_count ?? row?.newCount ?? 0,
+          yourCount: row?.your_count ?? row?.yourCount ?? 0,
+          openCount: row?.open_count ?? row?.openCount ?? 0,
+          unassignedCount: row?.unassigned_count ?? row?.unassignedCount ?? 0
         });
       });
     })
@@ -1679,4 +1809,3 @@ if (!isNetlify) {
 }
 
 module.exports = { app, ready };
-

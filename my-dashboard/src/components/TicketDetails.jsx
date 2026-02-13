@@ -9,10 +9,6 @@ const formatDate = (value) => {
 };
 
 const TicketDetails = ({ ticketId, initialTicket, profile, hasTask, onBack }) => {
-  const attachmentHref = (url) => {
-    if (!url) return '#';
-    return /^https?:\/\//i.test(url) ? url : `${API_BASE}${url}`;
-  };
   const [ticket, setTicket] = useState(initialTicket || null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -42,13 +38,58 @@ const TicketDetails = ({ ticketId, initialTicket, profile, hasTask, onBack }) =>
   const canComment = hasTask && hasTask('Comment on Tickets');
   const canAssignOthers = canModify && (profile?.role === 'Admin' || profile?.role === 'Manager');
 
+  const fetchAttachmentBlob = async (attachmentId) => {
+    const token = sessionStorage.getItem('token');
+    const response = await fetch(`${API_BASE}/api/attachments/${attachmentId}/download`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!response.ok) {
+      let message = 'Failed to load attachment.';
+      try {
+        const data = await response.json();
+        message = data?.message || message;
+      } catch (err) {
+        // ignore non-JSON error bodies
+      }
+      throw new Error(message);
+    }
+    return response.blob();
+  };
+
+  const handleViewAttachment = async (attachmentId) => {
+    try {
+      const blob = await fetchAttachmentBlob(attachmentId);
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank', 'noopener,noreferrer');
+      setTimeout(() => URL.revokeObjectURL(url), 60 * 1000);
+    } catch (err) {
+      setCommentMessage(err?.message || 'Failed to open attachment.');
+    }
+  };
+
+  const handleDownloadAttachment = async (attachmentId, originalName) => {
+    try {
+      const blob = await fetchAttachmentBlob(attachmentId);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = originalName || `attachment-${attachmentId}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setCommentMessage(err?.message || 'Failed to download attachment.');
+    }
+  };
+
   useEffect(() => {
     const fetchTicket = async () => {
       if (!ticketId) return;
       setLoading(true);
       setError('');
       try {
-        const token = localStorage.getItem('token');
+        const token = sessionStorage.getItem('token');
         const response = await fetch(`${API_BASE}/api/tickets/${ticketId}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
@@ -86,7 +127,7 @@ const TicketDetails = ({ ticketId, initialTicket, profile, hasTask, onBack }) =>
     const fetchComments = async () => {
       if (!ticketId) return;
       try {
-        const token = localStorage.getItem('token');
+        const token = sessionStorage.getItem('token');
         const response = await fetch(`${API_BASE}/api/tickets/${ticketId}/comments`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
@@ -105,7 +146,7 @@ const TicketDetails = ({ ticketId, initialTicket, profile, hasTask, onBack }) =>
   useEffect(() => {
     const fetchDepartments = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = sessionStorage.getItem('token');
         const response = await fetch(`${API_BASE}/api/departments`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
@@ -125,7 +166,7 @@ const TicketDetails = ({ ticketId, initialTicket, profile, hasTask, onBack }) =>
     const fetchAssignableUsers = async () => {
       if (!canAssignOthers) return;
       try {
-        const token = localStorage.getItem('token');
+        const token = sessionStorage.getItem('token');
         const response = await fetch(`${API_BASE}/api/users`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
@@ -145,7 +186,7 @@ const TicketDetails = ({ ticketId, initialTicket, profile, hasTask, onBack }) =>
     setSaveMessage('');
     setSaving(true);
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       const response = await fetch(`${API_BASE}/api/tickets/${ticketId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
@@ -184,7 +225,7 @@ const TicketDetails = ({ ticketId, initialTicket, profile, hasTask, onBack }) =>
     setSaveMessage('');
     setSaving(true);
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       const response = await fetch(`${API_BASE}/api/tickets/${ticketId}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
@@ -207,7 +248,7 @@ const TicketDetails = ({ ticketId, initialTicket, profile, hasTask, onBack }) =>
     setCommentMessage('');
     setCommentLoading(true);
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       const formData = new FormData();
       formData.append('body', commentBody);
       if (commentAttachment) formData.append('attachment', commentAttachment);
@@ -242,7 +283,7 @@ const TicketDetails = ({ ticketId, initialTicket, profile, hasTask, onBack }) =>
     const ok = window.confirm('Delete this attachment?');
     if (!ok) return;
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       const res = await fetch(`${API_BASE}/api/attachments/${attachmentId}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
@@ -372,21 +413,20 @@ const TicketDetails = ({ ticketId, initialTicket, profile, hasTask, onBack }) =>
                 <ul className="space-y-1 text-sm">
                   {ticket.attachments.map((att) => (
                     <li key={att.id} className="flex items-center gap-2">
-                      <a
-                        href={attachmentHref(att.url)}
-                        target="_blank"
-                        rel="noreferrer"
+                      <button
+                        type="button"
+                        onClick={() => handleViewAttachment(att.id)}
                         className="text-orange-600 hover:underline"
                       >
                         {att.originalName}
-                      </a>
-                      <a
-                        href={attachmentHref(att.url)}
-                        download
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDownloadAttachment(att.id, att.originalName)}
                         className="text-xs text-gray-500 hover:text-gray-700"
                       >
                         Download
-                      </a>
+                      </button>
                       {isAdmin && (
                         <button
                           type="button"
@@ -537,21 +577,20 @@ const TicketDetails = ({ ticketId, initialTicket, profile, hasTask, onBack }) =>
                       <div className="mt-2">
                         {comment.attachments.map((att) => (
                           <div key={att.id} className="flex items-center gap-2">
-                            <a
-                              href={attachmentHref(att.url)}
-                              target="_blank"
-                              rel="noreferrer"
+                            <button
+                              type="button"
+                              onClick={() => handleViewAttachment(att.id)}
                               className="text-xs text-orange-600 hover:underline"
                             >
                               {att.originalName}
-                            </a>
-                            <a
-                              href={attachmentHref(att.url)}
-                              download
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDownloadAttachment(att.id, att.originalName)}
                               className="text-xs text-gray-500 hover:text-gray-700"
                             >
                               Download
-                            </a>
+                            </button>
                             {isAdmin && (
                               <button
                                 type="button"
