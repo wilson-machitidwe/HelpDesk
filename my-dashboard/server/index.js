@@ -25,10 +25,16 @@ const SMTP_FROM = process.env.SMTP_FROM;
 const isNetlify = !!process.env.NETLIFY;
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const SUPABASE_SECRET_KEY = process.env.SUPABASE_SECRET_KEY;
 const SUPABASE_STORAGE_BUCKET = process.env.SUPABASE_STORAGE_BUCKET || 'uploads';
+const SUPABASE_API_KEY = SUPABASE_SERVICE_ROLE_KEY || SUPABASE_SECRET_KEY;
+const hasPublishableSupabaseKey = String(SUPABASE_API_KEY || '').startsWith('sb_publishable_');
+if (SUPABASE_URL && hasPublishableSupabaseKey) {
+  console.warn('Supabase Storage disabled: publishable key detected. Use SUPABASE_SERVICE_ROLE_KEY or SUPABASE_SECRET_KEY for server uploads.');
+}
 const supabase =
-  SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
-    ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+  SUPABASE_URL && SUPABASE_API_KEY && !hasPublishableSupabaseKey
+    ? createClient(SUPABASE_URL, SUPABASE_API_KEY, {
         auth: { persistSession: false }
       })
     : null;
@@ -168,17 +174,80 @@ function getDisplayNameFor(username) {
     .catch(() => username);
 }
 
-function getUserTasks(userId) {
+function getUserTasks(userId, role) {
   return new Promise((resolve, reject) => {
     db.all(
-      `SELECT t.id, t.name
-       FROM user_tasks ut
-       JOIN tasks t ON t.id = ut.task_id
-       WHERE ut.user_id = ?`,
-      [userId],
+      `SELECT DISTINCT id, name
+       FROM (
+         SELECT t.id, t.name
+         FROM user_tasks ut
+         JOIN tasks t ON t.id = ut.task_id
+         WHERE ut.user_id = ?
+         UNION
+         SELECT t.id, t.name
+         FROM role_tasks rt
+         JOIN tasks t ON t.id = rt.task_id
+         WHERE rt.role = ?
+       ) merged
+       ORDER BY name`,
+      [userId, role],
       (err, rows) => {
         if (err) return reject(err);
         resolve(rows || []);
+      }
+    );
+  });
+}
+
+function listTasksByUserIds(userIds) {
+  return new Promise((resolve, reject) => {
+    if (!userIds.length) return resolve({});
+    const placeholders = userIds.map(() => '?').join(', ');
+    db.all(
+      `SELECT ut.user_id, t.id as taskId, t.name as taskName
+       FROM user_tasks ut
+       JOIN tasks t ON t.id = ut.task_id
+       WHERE ut.user_id IN (${placeholders})`,
+      userIds,
+      (err, rows) => {
+        if (err) return reject(err);
+        const map = {};
+        (rows || []).forEach((row) => {
+          const userId = row.user_id || row.userid || row.userId;
+          const taskId = row.taskId ?? row.taskid ?? row.task_id;
+          const taskName = row.taskName || row.taskname || row.name;
+          if (!userId || !taskName) return;
+          if (!map[userId]) map[userId] = [];
+          map[userId].push({ id: taskId, name: taskName });
+        });
+        resolve(map);
+      }
+    );
+  });
+}
+
+function listRoleTasksByRoles(roles) {
+  return new Promise((resolve, reject) => {
+    if (!roles.length) return resolve({});
+    const placeholders = roles.map(() => '?').join(', ');
+    db.all(
+      `SELECT rt.role, t.id as taskId, t.name as taskName
+       FROM role_tasks rt
+       JOIN tasks t ON t.id = rt.task_id
+       WHERE rt.role IN (${placeholders})`,
+      roles,
+      (err, rows) => {
+        if (err) return reject(err);
+        const map = {};
+        (rows || []).forEach((row) => {
+          const role = row.role;
+          const taskId = row.taskId ?? row.taskid ?? row.task_id;
+          const taskName = row.taskName || row.taskname || row.name;
+          if (!role || !taskName) return;
+          if (!map[role]) map[role] = [];
+          map[role].push({ id: taskId, name: taskName });
+        });
+        resolve(map);
       }
     );
   });
@@ -674,16 +743,7 @@ function getAttachmentUrl({ id }) {
 }
 
 function canUserAccessTicketByRole(ticket, reqUser, displayName) {
-  if (!ticket) return false;
-  const role = reqUser?.role;
-  const username = reqUser?.username || '';
-  if (role === 'User') {
-    return ticket.creator === username || ticket.creator === displayName;
-  }
-  if (role === 'Technician') {
-    return !ticket.assignee || ticket.assignee === username;
-  }
-  return true;
+  return !!ticket && !!reqUser;
 }
 
 async function resolveDisplayName(username) {
@@ -886,7 +946,7 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
-    const userTasks = await getUserTasks(user.id);
+    const userTasks = await getUserTasks(user.id, user.role);
     const token = jwt.sign({ id: user.id, username: user.username, role: user.role, isSuper: !!user.isSuper }, JWT_SECRET, { expiresIn: '15m' });
     try {
       await logAudit({
@@ -1143,25 +1203,27 @@ app.get('/api/users', authMiddleware, (req, res) => {
     if (err) return res.status(500).json({ message: err.message });
     const users = (rows || []).map(normalizeUser);
     if (!users.length) return res.json([]);
-    const ids = users.map(u => u.id);
-    const placeholders = ids.map(() => '?').join(', ');
-    db.all(
-      `SELECT ut.user_id, t.id as taskId, t.name as taskName
-       FROM user_tasks ut
-       JOIN tasks t ON t.id = ut.task_id
-       WHERE ut.user_id IN (${placeholders})`,
-      ids,
-      (taskErr, taskRows) => {
-        if (taskErr) return res.status(500).json({ message: taskErr.message });
-        const taskMap = {};
-        (taskRows || []).forEach((row) => {
-          if (!taskMap[row.user_id]) taskMap[row.user_id] = [];
-          taskMap[row.user_id].push({ id: row.taskId, name: row.taskName });
+    const ids = users.map((u) => u.id);
+    const roles = [...new Set(users.map((u) => u.role).filter(Boolean))];
+    Promise.all([listTasksByUserIds(ids), listRoleTasksByRoles(roles)])
+      .then(([userTaskMap, roleTaskMap]) => {
+        const enriched = users.map((u) => {
+          const direct = userTaskMap[u.id] || [];
+          const inherited = roleTaskMap[u.role] || [];
+          const merged = [...direct, ...inherited];
+          const deduped = Object.values(
+            merged.reduce((acc, task) => {
+              if (!task?.name) return acc;
+              const key = `${task.id}:${task.name}`;
+              acc[key] = task;
+              return acc;
+            }, {})
+          );
+          return { ...u, tasks: deduped };
         });
-        const enriched = users.map(u => ({ ...u, tasks: taskMap[u.id] || [] }));
         res.json(enriched);
-      }
-    );
+      })
+      .catch((taskErr) => res.status(500).json({ message: taskErr.message }));
   });
 });
 
@@ -1294,22 +1356,6 @@ app.delete('/api/users/:id', authMiddleware, (req, res) => {
 });
 
 app.get('/api/tickets', authMiddleware, (req, res) => {
-  const role = req.user?.role;
-  const username = req.user?.username || '';
-  if (role === 'User') {
-    return getDisplayNameFor(username)
-      .then((displayName) => {
-        db.all(
-          'SELECT * FROM tickets WHERE creator = ? OR creator = ?',
-          [username, displayName],
-          (err, rows) => {
-            if (err) return res.status(500).json({ message: err.message });
-            res.json((rows || []).map(normalizeTicket));
-          }
-        );
-      })
-      .catch((err) => res.status(500).json({ message: err.message }));
-  }
   db.all('SELECT * FROM tickets', [], (err, rows) => {
     if (err) return res.status(500).json({ message: err.message });
     res.json((rows || []).map(normalizeTicket));
@@ -1317,39 +1363,24 @@ app.get('/api/tickets', authMiddleware, (req, res) => {
 });
 
 app.get('/api/tickets/:id(\\d+)', authMiddleware, (req, res) => {
-  const role = req.user?.role;
-  const username = req.user?.username || '';
-  const fetchAndRespond = (displayName) => {
-    db.get('SELECT * FROM tickets WHERE id = ?', [req.params.id], (err, row) => {
-      if (err) return res.status(500).json({ message: err.message });
-      if (!row) return res.status(404).json({ message: 'Ticket not found' });
-      const normalizedTicket = normalizeTicket(row);
-      if (role === 'User' && row.creator !== username && row.creator !== displayName) {
-        return res.status(403).json({ message: 'Not authorized to view this ticket' });
-      }
-      db.all('SELECT * FROM attachments WHERE ticket_id = ? AND comment_id IS NULL', [row.id], (aErr, attachments) => {
-        if (aErr) return res.json(normalizedTicket);
-        const mapped = (attachments || []).map((a) => ({
-          id: a.id,
-          originalName: a.original_name,
-          size: a.size,
-          mime: a.mime,
-          url: getAttachmentUrl({ id: a.id }),
-          createdAt: a.createdAt || a.createdat || a.created_at,
-          uploader: a.uploader
-        }));
-        res.json({ ...normalizedTicket, attachments: mapped });
-      });
+  db.get('SELECT * FROM tickets WHERE id = ?', [req.params.id], (err, row) => {
+    if (err) return res.status(500).json({ message: err.message });
+    if (!row) return res.status(404).json({ message: 'Ticket not found' });
+    const normalizedTicket = normalizeTicket(row);
+    db.all('SELECT * FROM attachments WHERE ticket_id = ? AND comment_id IS NULL', [row.id], (aErr, attachments) => {
+      if (aErr) return res.json(normalizedTicket);
+      const mapped = (attachments || []).map((a) => ({
+        id: a.id,
+        originalName: a.original_name,
+        size: a.size,
+        mime: a.mime,
+        url: getAttachmentUrl({ id: a.id }),
+        createdAt: a.createdAt || a.createdat || a.created_at,
+        uploader: a.uploader
+      }));
+      res.json({ ...normalizedTicket, attachments: mapped });
     });
-  };
-
-  if (role === 'User') {
-    return getDisplayNameFor(username)
-      .then((displayName) => fetchAndRespond(displayName))
-      .catch((err) => res.status(500).json({ message: err.message }));
-  }
-
-  return fetchAndRespond(username);
+  });
 });
 
 app.post('/api/tickets', authMiddleware, maybeUploadSingle('attachment'), (req, res) => {
@@ -1369,11 +1400,14 @@ app.post('/api/tickets', authMiddleware, maybeUploadSingle('attachment'), (req, 
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
      RETURNING id`,
     [safeDepartment, summary, safeDescription, safeCreator, safeStatus, safePriority, safeCategory, safeAssignee, createdAt],
-    function (err) {
+    async function (err) {
       if (err) return res.status(500).json({ message: err.message });
       if (req.file) {
-        saveAttachment({ ticketId: this.lastID, file: req.file, uploader: req.user?.username })
-          .catch((uploadErr) => console.error('Attachment save error:', uploadErr?.message || uploadErr));
+        try {
+          await saveAttachment({ ticketId: this.lastID, file: req.file, uploader: req.user?.username });
+        } catch (uploadErr) {
+          console.error('Attachment save error:', uploadErr?.message || uploadErr);
+        }
       }
       sendTicketNotification('opened', { id: this.lastID, department: safeDepartment, summary, status: safeStatus, priority: safePriority, category: safeCategory, assignee: safeAssignee, creator: safeCreator }, req.user?.username)
         .catch((mailErr) => console.error('Notification error:', mailErr.message || mailErr));
@@ -1510,109 +1544,86 @@ app.delete('/api/tickets/:id', authMiddleware, adminOnly, async (req, res) => {
 });
 
 app.get('/api/tickets/:id/comments', authMiddleware, (req, res) => {
-  const role = req.user?.role;
-  const username = req.user?.username || '';
-  const fetchAndRespond = (displayName) => {
-    db.get('SELECT * FROM tickets WHERE id = ?', [req.params.id], (err, ticket) => {
-      if (err) return res.status(500).json({ message: err.message });
-      if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
-      if (role === 'User' && ticket.creator !== username && ticket.creator !== displayName) {
-        return res.status(403).json({ message: 'Not authorized to view this ticket' });
-      }
-      db.all(
-        'SELECT * FROM ticket_comments WHERE ticket_id = ? ORDER BY createdAt DESC',
-        [req.params.id],
-        (cErr, rows) => {
-          if (cErr) return res.status(500).json({ message: cErr.message });
-          const comments = rows || [];
-          if (!comments.length) return res.json([]);
-          const ids = comments.map((c) => c.id);
-          const placeholders = ids.map(() => '?').join(', ');
-          db.all(
-            `SELECT * FROM attachments WHERE comment_id IN (${placeholders})`,
-            ids,
-            (aErr, attachments) => {
-              if (aErr) return res.json(comments);
-              const map = new Map();
-              (attachments || []).forEach((a) => {
-                const list = map.get(a.comment_id) || [];
-                list.push({
-                  id: a.id,
-                  originalName: a.original_name,
-                  size: a.size,
-                  mime: a.mime,
-                  url: getAttachmentUrl({ id: a.id }),
-                  createdAt: a.createdAt || a.createdat || a.created_at,
-                  uploader: a.uploader
-                });
-                map.set(a.comment_id, list);
+  db.get('SELECT * FROM tickets WHERE id = ?', [req.params.id], (err, ticket) => {
+    if (err) return res.status(500).json({ message: err.message });
+    if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
+    db.all(
+      'SELECT * FROM ticket_comments WHERE ticket_id = ? ORDER BY createdAt DESC',
+      [req.params.id],
+      (cErr, rows) => {
+        if (cErr) return res.status(500).json({ message: cErr.message });
+        const comments = rows || [];
+        if (!comments.length) return res.json([]);
+        const ids = comments.map((c) => c.id);
+        const placeholders = ids.map(() => '?').join(', ');
+        db.all(
+          `SELECT * FROM attachments WHERE comment_id IN (${placeholders})`,
+          ids,
+          (aErr, attachments) => {
+            if (aErr) return res.json(comments);
+            const map = new Map();
+            (attachments || []).forEach((a) => {
+              const list = map.get(a.comment_id) || [];
+              list.push({
+                id: a.id,
+                originalName: a.original_name,
+                size: a.size,
+                mime: a.mime,
+                url: getAttachmentUrl({ id: a.id }),
+                createdAt: a.createdAt || a.createdat || a.created_at,
+                uploader: a.uploader
               });
-              res.json(comments.map((c) => ({
-                ...c,
-                createdAt: c.createdAt || c.createdat || c.created_at,
-                attachments: map.get(c.id) || []
-              })));
-            }
-          );
-        }
-      );
-    });
-  };
-
-  if (role === 'User') {
-    return getDisplayNameFor(username)
-      .then((displayName) => fetchAndRespond(displayName))
-      .catch((err) => res.status(500).json({ message: err.message }));
-  }
-
-  return fetchAndRespond(username);
+              map.set(a.comment_id, list);
+            });
+            res.json(comments.map((c) => ({
+              ...c,
+              createdAt: c.createdAt || c.createdat || c.created_at,
+              attachments: map.get(c.id) || []
+            })));
+          }
+        );
+      }
+    );
+  });
 });
 
 app.post('/api/tickets/:id/comments', authMiddleware, maybeUploadSingle('attachment'), (req, res) => {
-  const role = req.user?.role;
   const username = req.user?.username || '';
   const { body } = req.body || {};
   if (!body || !body.trim()) return res.status(400).json({ message: 'Comment is required' });
-  getDisplayNameFor(username)
-    .then((displayName) => {
-      db.get('SELECT * FROM tickets WHERE id = ?', [req.params.id], (err, ticket) => {
-        if (err) return res.status(500).json({ message: err.message });
-        if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
-        if (role === 'User' && ticket.creator !== username && ticket.creator !== displayName) {
-          return res.status(403).json({ message: 'Not authorized to comment on this ticket' });
-        }
-        if (role === 'Technician' && ticket.assignee !== username) {
-          return res.status(403).json({ message: 'Not authorized to comment on this ticket' });
-        }
-        const createdAt = new Date().toISOString();
-        db.run(
-          `INSERT INTO ticket_comments (ticket_id, author, body, createdAt)
-           VALUES (?, ?, ?, ?)
-           RETURNING id`,
-          [req.params.id, username, body.trim(), createdAt],
-          function (cErr) {
-            if (cErr) return res.status(500).json({ message: cErr.message });
-            if (req.file) {
-              saveAttachment({ ticketId: req.params.id, commentId: this.lastID, file: req.file, uploader: username })
-                .catch((uploadErr) => console.error('Attachment save error:', uploadErr?.message || uploadErr));
-            }
-            sendTicketNotification('commented', ticket, username, { comment: body.trim() })
-              .catch((mailErr) => console.error('Notification error:', mailErr.message || mailErr));
-            logAudit({
-              action: 'ticket_commented',
-              entityType: 'ticket',
-              entityId: req.params.id,
-              actor: { id: req.user?.id, username: req.user?.username, role: req.user?.role },
-              detail: { commentId: this.lastID },
-              ip: req.ip
-            }).then(() => {
-              res.json({ id: this.lastID, message: 'Comment added' });
-            });
+  db.get('SELECT * FROM tickets WHERE id = ?', [req.params.id], (err, ticket) => {
+    if (err) return res.status(500).json({ message: err.message });
+    if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
+    const createdAt = new Date().toISOString();
+    db.run(
+      `INSERT INTO ticket_comments (ticket_id, author, body, createdAt)
+       VALUES (?, ?, ?, ?)
+       RETURNING id`,
+      [req.params.id, username, body.trim(), createdAt],
+      async function (cErr) {
+        if (cErr) return res.status(500).json({ message: cErr.message });
+        if (req.file) {
+          try {
+            await saveAttachment({ ticketId: req.params.id, commentId: this.lastID, file: req.file, uploader: username });
+          } catch (uploadErr) {
+            console.error('Attachment save error:', uploadErr?.message || uploadErr);
           }
-        );
-      });
-    })
-    .catch((nameErr) => res.status(500).json({ message: nameErr.message }));
+        }
+        sendTicketNotification('commented', ticket, username, { comment: body.trim() })
+          .catch((mailErr) => console.error('Notification error:', mailErr.message || mailErr));
+        logAudit({
+          action: 'ticket_commented',
+          entityType: 'ticket',
+          entityId: req.params.id,
+          actor: { id: req.user?.id, username: req.user?.username, role: req.user?.role },
+          detail: { commentId: this.lastID },
+          ip: req.ip
+        }).then(() => {
+          res.json({ id: this.lastID, message: 'Comment added' });
+        });
+      }
+    );
+  });
 });
 
 app.delete('/api/attachments/:id', authMiddleware, adminOnly, (req, res) => {

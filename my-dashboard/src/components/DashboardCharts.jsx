@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import TicketHistoryChart from './TicketHistoryChart';
 import DonutChart from './DonutChart';
 import TicketChurnChart from './TicketChurnChart';
-import { API_BASE } from '../config/apiBase';
+import { apiFetchJson } from '../config/apiBase';
 
 const DashboardCharts = ({ refreshKey, hasTask }) => {
   const [tickets, setTickets] = useState([]);
@@ -10,11 +10,10 @@ const DashboardCharts = ({ refreshKey, hasTask }) => {
   useEffect(() => {
     const fetchTickets = async () => {
       const token = sessionStorage.getItem('token');
-      const response = await fetch(`${API_BASE}/api/tickets`, {
+      const result = await apiFetchJson('/api/tickets', {
         headers: { Authorization: `Bearer ${token}` }
       });
-      const data = await response.json();
-      setTickets(Array.isArray(data) ? data : []);
+      setTickets(Array.isArray(result.data) ? result.data : []);
     };
     fetchTickets();
   }, [refreshKey]);
@@ -49,7 +48,7 @@ const DashboardCharts = ({ refreshKey, hasTask }) => {
   const noWidgets = !showHistory && !showChurn && !showFirstResponse && !showCloseTime && !showCategory && !showCreators;
 
   return (
-    <div className="grid grid-cols-5 xl:grid-cols-5 gap-5 mt-2 px-6">
+    <div className="grid grid-cols-1 xl:grid-cols-5 gap-5 mt-2 px-4 md:px-6">
       <div className="xl:col-span-3 space-y-5">
         {showHistory && (
           <div className="bg-white rounded-md border border-gray-300 shadow-sm overflow-hidden">

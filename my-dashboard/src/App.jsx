@@ -115,13 +115,99 @@ function App() {
 
   const displayName = [profile?.firstName, profile?.lastName].filter(Boolean).join(' ') || profile?.username || 'User';
   const userTasks = Array.isArray(profile?.tasks) ? profile.tasks : [];
-  const hasTask = (taskName) => profile?.role === 'Admin' || userTasks.some((t) => t.name === taskName);
+  const normalizeTaskName = (value) => String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  const taskAliases = {
+    'View Tickets Page': ['View Ticket Page'],
+    'View Users Page': ['View User Page'],
+    'Comment on Tickets': ['Comment on Ticket'],
+    'Manage Categories': ['Manage Category'],
+    'Manage Departments': ['Manage Department']
+  };
+  const normalizedTaskNames = React.useMemo(
+    () =>
+      new Set(
+        userTasks
+          .map((task) => {
+            if (typeof task === 'string') return normalizeTaskName(task);
+            return normalizeTaskName(task?.name || task?.taskName || task?.label);
+          })
+          .filter(Boolean)
+      ),
+    [userTasks]
+  );
+  const hasTask = React.useCallback(
+    (taskName) => {
+      if (profile?.role === 'Admin') return true;
+      const normalized = normalizeTaskName(taskName);
+      if (normalizedTaskNames.has(normalized)) return true;
+      const aliases = taskAliases[taskName] || [];
+      return aliases.some((alias) => normalizedTaskNames.has(normalizeTaskName(alias)));
+    },
+    [profile?.role, normalizedTaskNames]
+  );
   const canViewConfig = hasTask('View Config Page');
   const canViewReports = profile?.role === 'Admin' || profile?.role === 'Manager' || hasTask('View Reports Page');
 
   React.useEffect(() => {
     setShowPasswordPrompt(!!profile?.mustChangePassword);
   }, [profile?.mustChangePassword]);
+
+  React.useEffect(() => {
+    if (!token) return undefined;
+    let active = true;
+
+    const syncProfileFromServer = async () => {
+      try {
+        const response = await fetch(`${API_BASE}/api/users`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await response.json();
+        if (!response.ok || !Array.isArray(data) || !active) return;
+        const cached = loadProfile();
+        const keyId = profile?.id || cached?.id;
+        const keyUsername = profile?.username || cached?.username;
+        const me = data.find((user) => String(user?.id) === String(keyId) || user?.username === keyUsername);
+        if (!me) return;
+
+        setProfile((prev) => {
+          const base = prev || cached || {};
+          const next = {
+            ...base,
+            id: me.id,
+            username: me.username,
+            role: me.role,
+            firstName: me.firstName,
+            lastName: me.lastName,
+            email: me.email,
+            phone: me.phone,
+            mustChangePassword: !!me.mustChangePassword,
+            tasks: Array.isArray(me.tasks) ? me.tasks : []
+          };
+          const unchanged =
+            base.id === next.id &&
+            base.username === next.username &&
+            base.role === next.role &&
+            base.firstName === next.firstName &&
+            base.lastName === next.lastName &&
+            base.email === next.email &&
+            base.phone === next.phone &&
+            !!base.mustChangePassword === !!next.mustChangePassword &&
+            JSON.stringify(base.tasks || []) === JSON.stringify(next.tasks || []);
+          if (!unchanged) sessionStorage.setItem('profile', JSON.stringify(next));
+          return unchanged ? base : next;
+        });
+      } catch (err) {
+        // best-effort profile sync
+      }
+    };
+
+    syncProfileFromServer();
+    const timer = window.setInterval(syncProfileFromServer, 30000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, [token, profile?.id, profile?.username]);
 
   const handlePasswordUpdate = async (e) => {
     e.preventDefault();

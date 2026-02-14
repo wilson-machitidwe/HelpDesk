@@ -42,7 +42,7 @@ const buildHistoryData = (tickets, days) => {
 const TicketHistoryChart = ({ tickets }) => {
   const data = useMemo(() => buildHistoryData(tickets || [], 8), [tickets]);
   return (
-    <div className="w-full h-[22.5rem] bg-white p-4">
+    <div className="w-full h-[19rem] md:h-[22.5rem] bg-white p-4">
       <h3 className="text-sm font-bold text-gray-700 mb-3">Ticket History</h3>
       <ResponsiveContainer width="100%" height="90%">
         <LineChart data={data}>

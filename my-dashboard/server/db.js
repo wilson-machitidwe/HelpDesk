@@ -191,6 +191,36 @@ class PgDb {
 
     await this.pool.query(`
       ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS password TEXT
+    `);
+
+    await this.pool.query(`
+      ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS isSuper INTEGER DEFAULT 0
+    `);
+
+    await this.pool.query(`
+      ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS firstName TEXT
+    `);
+
+    await this.pool.query(`
+      ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS lastName TEXT
+    `);
+
+    await this.pool.query(`
+      ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS email TEXT
+    `);
+
+    await this.pool.query(`
+      ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS phone TEXT
+    `);
+
+    await this.pool.query(`
+      ALTER TABLE users
       ADD COLUMN IF NOT EXISTS mustChangePassword INTEGER DEFAULT 0
     `);
 
@@ -215,6 +245,21 @@ class PgDb {
     `);
 
     await this.pool.query(`
+      ALTER TABLE ticket_comments
+      ADD COLUMN IF NOT EXISTS createdAt TIMESTAMPTZ
+    `);
+
+    await this.pool.query(`
+      ALTER TABLE attachments
+      ADD COLUMN IF NOT EXISTS createdAt TIMESTAMPTZ
+    `);
+
+    await this.pool.query(`
+      ALTER TABLE audit_logs
+      ADD COLUMN IF NOT EXISTS createdAt TIMESTAMPTZ
+    `);
+
+    await this.pool.query(`
       ALTER TABLE departments
       ADD COLUMN IF NOT EXISTS name TEXT
     `);
@@ -222,6 +267,11 @@ class PgDb {
     await this.pool.query(`
       ALTER TABLE notification_settings
       ADD COLUMN IF NOT EXISTS notification_matrix TEXT
+    `);
+
+    await this.pool.query(`
+      ALTER TABLE notification_settings
+      ADD COLUMN IF NOT EXISTS notification_templates TEXT
     `);
   }
 

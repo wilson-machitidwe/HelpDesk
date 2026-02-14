@@ -55,6 +55,13 @@ Frontend API base in production:
 - If uploads are enabled, test file upload and retrieval.
 
 ## 5) Common failures
+- `Cannot connect to server. Is the Backend running?` on login:
+  - In browser, open:
+    - `https://<your-site>.netlify.app/api/health`
+  - If this fails, open Netlify -> Functions -> Logs and inspect the latest `api` invocation.
+  - Confirm `VITE_API_BASE` is empty in Netlify for production (do not point it to `localhost`).
+  - Confirm redirect exists in `netlify.toml`:
+    - `/api/*` -> `/.netlify/functions/api/:splat`
 - `401/invalid token` after login:
   - Confirm `JWT_SECRET` is set and unchanged during active sessions.
 - `Database connections will fail` warning:

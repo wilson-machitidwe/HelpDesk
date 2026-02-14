@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { API_BASE } from '../config/apiBase';
+import { API_BASE, apiFetchJson } from '../config/apiBase';
 
 const roleOptions = ['Admin', 'Manager', 'Technician', 'User'];
 
@@ -23,12 +23,13 @@ const UserManagement = () => {
   const isEditing = Boolean(editingId);
 
   const fetchUsers = async () => {
-    const token = localStorage.getItem('token');
-    const res = await fetch(`${API_BASE}/api/users`, {
+    const token = sessionStorage.getItem('token');
+    const res = await apiFetchJson('/api/users', {
       headers: { Authorization: `Bearer ${token}` }
     });
-    const data = await res.json();
+    const data = res.data;
     if (Array.isArray(data)) setUsers(data);
+    else setUsers([]);
   };
 
   useEffect(() => {
@@ -44,7 +45,7 @@ const UserManagement = () => {
       return;
     }
 
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
     const url = isEditing ? `${API_BASE}/api/users/${editingId}` : `${API_BASE}/api/users`;
     const res = await fetch(url, {
       method: isEditing ? 'PUT' : 'POST',
@@ -94,7 +95,7 @@ const UserManagement = () => {
 
   const handleDelete = async (userId) => {
     if (!window.confirm('Delete this user?')) return;
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
     const res = await fetch(`${API_BASE}/api/users/${userId}`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${token}` }
@@ -113,7 +114,7 @@ const UserManagement = () => {
     if (!nextPassword) return;
     setMessage('');
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       const res = await fetch(`${API_BASE}/api/users/${user.id}/password`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -136,7 +137,7 @@ const UserManagement = () => {
         <h3 className="text-lg font-bold text-gray-700 mb-2">Manage Users</h3>
         <p className="text-sm text-gray-500 mb-4">Create, edit, reset passwords, and delete user accounts.</p>
 
-        <div className="border border-gray-200 rounded-md shadow-sm overflow-hidden">
+        <div className="border border-gray-200 rounded-md shadow-sm overflow-x-auto">
           <table className="w-full text-left">
             <thead className="bg-gray-50 text-xs uppercase text-gray-500 font-bold">
               <tr>

@@ -8,7 +8,7 @@ const DepartmentManager = () => {
   const [departmentMessage, setDepartmentMessage] = useState('');
 
   const fetchDepartments = async () => {
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
     const res = await fetch(`${API_BASE}/api/departments`, {
       headers: { 'Authorization': `Bearer ${token}` }
     });
@@ -24,7 +24,7 @@ const DepartmentManager = () => {
     e.preventDefault();
     setDepartmentMessage('');
     if (!departmentName.trim()) return;
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
     const url = departmentEditingId
       ? `${API_BASE}/api/departments/${departmentEditingId}`
       : `${API_BASE}/api/departments`;
@@ -51,7 +51,7 @@ const DepartmentManager = () => {
 
   const handleDeleteDepartment = async (departmentId) => {
     if (!window.confirm('Delete this department?')) return;
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
     const res = await fetch(`${API_BASE}/api/departments/${departmentId}`, {
       method: 'DELETE',
       headers: { 'Authorization': `Bearer ${token}` }

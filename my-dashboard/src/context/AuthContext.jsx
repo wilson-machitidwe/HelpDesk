@@ -18,8 +18,8 @@ async function api(path, options = {}) {
     const r = await fetch(`${API_BASE}/api/auth/refresh`, { method: 'POST', credentials: 'include' });
     if (r.ok) {
       const json = await r.json();
-      // store new token in localStorage for access usage
-      localStorage.setItem(TOKEN_KEY, json.token);
+      // store new token in sessionStorage for access usage
+      sessionStorage.setItem(TOKEN_KEY, json.token);
       setToken(json.token);
       setCurrentUser(json.user);
       // retry original
@@ -43,7 +43,7 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     try {
-      const t = localStorage.getItem(TOKEN_KEY);
+      const t = sessionStorage.getItem(TOKEN_KEY);
       if (t) {
         setToken(t);
         // fetch current user info via users endpoint or decode token
@@ -78,7 +78,7 @@ export const AuthProvider = ({ children }) => {
       }
       const json = await res.json();
       setToken(json.token);
-      localStorage.setItem(TOKEN_KEY, json.token);
+      sessionStorage.setItem(TOKEN_KEY, json.token);
       setCurrentUser(json.user);
       return { ok: true, user: json.user };
     } catch (err) {
@@ -91,7 +91,7 @@ export const AuthProvider = ({ children }) => {
     try { fetch(`${API_BASE}/api/auth/logout`, { method: 'POST', credentials: 'include' }); } catch (e) {}
     setToken(null);
     setCurrentUser(null);
-    localStorage.removeItem(TOKEN_KEY);
+    sessionStorage.removeItem(TOKEN_KEY);
   };
 
   const fetchUsers = async () => {

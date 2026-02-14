@@ -13,13 +13,14 @@ const Login = ({ onLoginSuccess }) => {
     setLoading(true);
 
     try {
-      const response = await fetch(`${API_BASE}/api/auth/login`, {
+      const loginUrl = `${API_BASE}/api/auth/login`;
+      const response = await fetch(loginUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),
       });
-
-      const data = await response.json();
+      const contentType = (response.headers.get('content-type') || '').toLowerCase();
+      const data = contentType.includes('application/json') ? await response.json() : {};
 
       if (response.ok) {
         sessionStorage.setItem('token', data.token);
@@ -47,7 +48,8 @@ const Login = ({ onLoginSuccess }) => {
         setError(data.message || 'Login failed');
       }
     } catch (err) {
-      setError('Cannot connect to server. Is the Backend running?');
+      const apiSource = API_BASE || (typeof window !== 'undefined' ? window.location.origin : '');
+      setError(`Cannot connect to server. Verify Netlify function and API route (${apiSource}/api/health).`);
     } finally {
       setLoading(false);
     }

@@ -8,7 +8,7 @@ const CategoryManager = () => {
   const [categoryMessage, setCategoryMessage] = useState('');
 
   const fetchCategories = async () => {
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
     const res = await fetch(`${API_BASE}/api/categories`, {
       headers: { 'Authorization': `Bearer ${token}` }
     });
@@ -24,7 +24,7 @@ const CategoryManager = () => {
     e.preventDefault();
     setCategoryMessage('');
     if (!categoryName.trim()) return;
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
     const url = categoryEditingId
       ? `${API_BASE}/api/categories/${categoryEditingId}`
       : `${API_BASE}/api/categories`;
@@ -51,7 +51,7 @@ const CategoryManager = () => {
 
   const handleDeleteCategory = async (categoryId) => {
     if (!window.confirm('Delete this category?')) return;
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
     const res = await fetch(`${API_BASE}/api/categories/${categoryId}`, {
       method: 'DELETE',
       headers: { 'Authorization': `Bearer ${token}` }

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { API_BASE } from '../config/apiBase';
+import { API_BASE, apiFetchJson } from '../config/apiBase';
 
 const TicketList = ({ refreshKey, onViewTicket, profile, hasTask, onTicketUpdated }) => {
   // 1. Define the state first so 'tickets' is recognized by the rest of the code
@@ -46,19 +46,11 @@ const TicketList = ({ refreshKey, onViewTicket, profile, hasTask, onTicketUpdate
     const fetchTickets = async () => {
       setLoading(true);
       try {
-        const token = localStorage.getItem('token');
-        const response = await fetch(`${API_BASE}/api/tickets`, {
+        const token = sessionStorage.getItem('token');
+        const response = await apiFetchJson('/api/tickets', {
           headers: { 'Authorization': `Bearer ${token}` }
         });
-        
-        // If the server fails, we still want to set an empty array to avoid crashes
-        if (!response.ok) {
-          setTickets([]);
-          return;
-        }
-
-        const data = await response.json();
-        // Force the data to be an array even if the database is empty
+        const data = response.data;
         setTickets(Array.isArray(data) ? data : []);
       } catch (error) {
         console.error("Error fetching tickets:", error);
@@ -72,11 +64,11 @@ const TicketList = ({ refreshKey, onViewTicket, profile, hasTask, onTicketUpdate
 
   useEffect(() => {
     const fetchCategories = async () => {
-      const token = localStorage.getItem('token');
-      const res = await fetch(`${API_BASE}/api/categories`, {
+      const token = sessionStorage.getItem('token');
+      const res = await apiFetchJson('/api/categories', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      const data = await res.json();
+      const data = res.data;
       if (Array.isArray(data)) setCategories(data);
     };
     fetchCategories();
@@ -84,11 +76,11 @@ const TicketList = ({ refreshKey, onViewTicket, profile, hasTask, onTicketUpdate
 
   useEffect(() => {
     const fetchDepartments = async () => {
-      const token = localStorage.getItem('token');
-      const res = await fetch(`${API_BASE}/api/departments`, {
+      const token = sessionStorage.getItem('token');
+      const res = await apiFetchJson('/api/departments', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      const data = await res.json();
+      const data = res.data;
       if (Array.isArray(data)) setDepartments(data);
     };
     fetchDepartments();
@@ -98,11 +90,11 @@ const TicketList = ({ refreshKey, onViewTicket, profile, hasTask, onTicketUpdate
     const fetchUsers = async () => {
       if (!canBulkUpdate) return;
       try {
-        const token = localStorage.getItem('token');
-        const res = await fetch(`${API_BASE}/api/users`, {
+        const token = sessionStorage.getItem('token');
+        const res = await apiFetchJson('/api/users', {
           headers: { 'Authorization': `Bearer ${token}` }
         });
-        const data = await res.json();
+        const data = res.data;
         if (Array.isArray(data)) setUsers(data);
       } catch (err) {
         setUsers([]);
@@ -257,7 +249,7 @@ const TicketList = ({ refreshKey, onViewTicket, profile, hasTask, onTicketUpdate
     if (!selectedIds.length) return;
     setActionMessage('');
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       const results = await Promise.all(selectedIds.map((id) => (
         fetch(`${API_BASE}/api/tickets/${id}`, {
           method: 'PUT',
@@ -344,7 +336,7 @@ const TicketList = ({ refreshKey, onViewTicket, profile, hasTask, onTicketUpdate
   const updateAssignee = async (ticketId, assignee) => {
     setActionMessage('');
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       const response = await fetch(`${API_BASE}/api/tickets/${ticketId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
@@ -366,7 +358,7 @@ const TicketList = ({ refreshKey, onViewTicket, profile, hasTask, onTicketUpdate
   if (loading) return <div className="p-10 text-center text-gray-500 italic">Loading tickets...</div>;
 
   return (
-    <div className="px-6 pb-10">
+    <div className="px-4 md:px-6 pb-10">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
           <div className="relative" ref={columnMenuRef}>
@@ -664,8 +656,8 @@ const TicketList = ({ refreshKey, onViewTicket, profile, hasTask, onTicketUpdate
         </div>
       )}
 
-      <div className="bg-white border border-gray-200 rounded-md shadow-sm overflow-hidden">
-        <table className="w-full text-left border-collapse">
+      <div className="bg-white border border-gray-200 rounded-md shadow-sm overflow-x-auto">
+        <table className="w-full min-w-[920px] text-left border-collapse">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200 text-xs uppercase text-gray-500 font-bold">
               <th className="px-4 py-3">

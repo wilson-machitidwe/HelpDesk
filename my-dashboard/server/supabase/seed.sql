@@ -127,9 +127,10 @@ select 'User', id from user_tasks
 on conflict do nothing;
 
 insert into categories (name) values
-  ('Electricity Problem'),
-  ('Water Problem'),
-  ('General Problem')
+  ('Electrical'),
+  ('Plumbing'),
+  ('Capentry & Painting'),
+  ('General Maintenance')
 on conflict do nothing;
 
 insert into departments (name) values
