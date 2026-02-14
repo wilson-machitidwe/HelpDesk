@@ -385,121 +385,121 @@ function seedTasks() {
 
 function seedRoleTasks() {
   return new Promise((resolve) => {
-    db.get('SELECT COUNT(*) as count FROM role_tasks', [], (err, row) => {
-      if (row && row.count > 0) {
-        db.get('SELECT id FROM tasks WHERE name = ?', ['View Reports Page'], (taskErr, taskRow) => {
-          if (taskErr || !taskRow) return resolve();
-          db.run(
-            'INSERT INTO role_tasks (role, task_id) VALUES (?, ?), (?, ?) ON CONFLICT (role, task_id) DO NOTHING',
-            ['Admin', taskRow.id, 'Manager', taskRow.id],
-            () => resolve()
-          );
-        });
-        return;
-      }
-      const rolePresets = {
-        Admin: [
-          'View Dashboard',
-          'View Tickets Page',
-          'View Users Page',
-          'View Reports Page',
-          'View Config Page',
-          'Create Users',
-          'Edit Users',
-          'Delete Users',
-          'Manage Categories',
-          'Manage Departments',
-          'Manage Email Notifications',
-          'Create Tickets',
-          'View All Tickets',
-          'Assign Tickets',
-          'Modify Tickets',
-          'Close Tickets',
-          'Delete Tickets',
-          'Edit Tickets',
-          'Comment on Tickets',
-          'View own Tickets',
-          'View New Tickets Stat',
-          'View Your Tickets Stat',
-          'View Open Tickets Stat',
-          'View Unassigned Tickets Stat',
-          'View Ticket History Chart',
-          'View Ticket Churn Chart',
-          'View First Response Time',
-          'View Tickets Close Time',
-          'View Category Breakdown',
-          'View Top Ticket Creators',
-          'View Ticket History',
-          'View own Ticket History'
-        ],
-        Manager: [
-          'View Dashboard',
-          'View Tickets Page',
-          'View Users Page',
-          'View Reports Page',
-          'Create Tickets',
-          'View All Tickets',
-          'Assign Tickets',
-          'Modify Tickets',
-          'Close Tickets',
-          'Edit Tickets',
-          'Comment on Tickets',
-          'View own Tickets',
-          'View New Tickets Stat',
-          'View Your Tickets Stat',
-          'View Open Tickets Stat',
-          'View Unassigned Tickets Stat',
-          'View Ticket History Chart',
-          'View Ticket Churn Chart',
-          'View First Response Time',
-          'View Tickets Close Time',
-          'View Category Breakdown',
-          'View Top Ticket Creators',
-          'View Ticket History',
-          'View own Ticket History'
-        ],
-        Technician: [
-          'View Dashboard',
-          'View Tickets Page',
-          'Create Tickets',
-          'View All Tickets',
-          'Assign Tickets',
-          'Modify Tickets',
-          'Edit Tickets',
-          'Comment on Tickets',
-          'View own Tickets',
-          'View New Tickets Stat',
-          'View Your Tickets Stat',
-          'View Open Tickets Stat',
-          'View Unassigned Tickets Stat',
-          'View Ticket History Chart',
-          'View Ticket Churn Chart',
-          'View First Response Time',
-          'View Tickets Close Time',
-          'View Category Breakdown',
-          'View Top Ticket Creators',
-          'View Ticket History',
-          'View own Ticket History'
-        ],
-        User: [
-          'View Dashboard',
-          'View Tickets Page',
-          'Create Tickets',
-          'Comment on Tickets',
-          'View own Tickets',
-          'View New Tickets Stat',
-          'View Your Tickets Stat',
-          'View Open Tickets Stat',
-          'View Unassigned Tickets Stat',
-          'View Ticket History Chart',
-          'View Ticket Churn Chart',
-          'View First Response Time',
-          'View Tickets Close Time',
-          'View Category Breakdown',
-          'View Top Ticket Creators',
-          'View own Ticket History'
-        ]
-      };
+    const rolePresets = {
+      Admin: [
+        'View Dashboard',
+        'View Tickets Page',
+        'View Users Page',
+        'View Reports Page',
+        'View Config Page',
+        'Create Users',
+        'Edit Users',
+        'Delete Users',
+        'Manage Categories',
+        'Manage Departments',
+        'Manage Email Notifications',
+        'Create Tickets',
+        'View All Tickets',
+        'Assign Tickets',
+        'Modify Tickets',
+        'Close Tickets',
+        'Delete Tickets',
+        'Edit Tickets',
+        'Comment on Tickets',
+        'View own Tickets',
+        'View New Tickets Stat',
+        'View Your Tickets Stat',
+        'View Open Tickets Stat',
+        'View Unassigned Tickets Stat',
+        'View Ticket History Chart',
+        'View Ticket Churn Chart',
+        'View First Response Time',
+        'View Tickets Close Time',
+        'View Category Breakdown',
+        'View Top Ticket Creators',
+        'View Ticket History',
+        'View own Ticket History'
+      ],
+      Manager: [
+        'View Dashboard',
+        'View Tickets Page',
+        'View Users Page',
+        'View Reports Page',
+        'Create Tickets',
+        'View All Tickets',
+        'Assign Tickets',
+        'Modify Tickets',
+        'Close Tickets',
+        'Edit Tickets',
+        'Comment on Tickets',
+        'View own Tickets',
+        'View New Tickets Stat',
+        'View Your Tickets Stat',
+        'View Open Tickets Stat',
+        'View Unassigned Tickets Stat',
+        'View Ticket History Chart',
+        'View Ticket Churn Chart',
+        'View First Response Time',
+        'View Tickets Close Time',
+        'View Category Breakdown',
+        'View Top Ticket Creators',
+        'View Ticket History',
+        'View own Ticket History'
+      ],
+      Technician: [
+        'View Dashboard',
+        'View Tickets Page',
+        'Create Tickets',
+        'View All Tickets',
+        'Assign Tickets',
+        'Modify Tickets',
+        'Edit Tickets',
+        'Comment on Tickets',
+        'View own Tickets',
+        'View New Tickets Stat',
+        'View Your Tickets Stat',
+        'View Open Tickets Stat',
+        'View Unassigned Tickets Stat',
+        'View Ticket History Chart',
+        'View Ticket Churn Chart',
+        'View First Response Time',
+        'View Tickets Close Time',
+        'View Category Breakdown',
+        'View Top Ticket Creators',
+        'View Ticket History',
+        'View own Ticket History'
+      ],
+      User: [
+        'View Dashboard',
+        'View Tickets Page',
+        'Create Tickets',
+        'Comment on Tickets',
+        'View own Tickets',
+        'View New Tickets Stat',
+        'View Your Tickets Stat',
+        'View Open Tickets Stat',
+        'View Unassigned Tickets Stat',
+        'View Ticket History Chart',
+        'View Ticket Churn Chart',
+        'View First Response Time',
+        'View Tickets Close Time',
+        'View Category Breakdown',
+        'View Top Ticket Creators',
+        'View own Ticket History'
+      ]
+    };
+
+    db.all('SELECT role, COUNT(*) as count FROM role_tasks GROUP BY role', [], (roleErr, roleRows) => {
+      if (roleErr) return resolve();
+      const roleCounts = {};
+      (roleRows || []).forEach((row) => {
+        roleCounts[row.role] = Number(row.count || 0);
+      });
+      const minimumExpected = { Admin: 5, Manager: 3, Technician: 3, User: 3 };
+      const needsRepair = Object.entries(minimumExpected).some(
+        ([role, min]) => Number(roleCounts[role] || 0) < min
+      );
+      if (!needsRepair) return resolve();
 
       db.all('SELECT id, name FROM tasks', [], (taskErr, taskRows) => {
         if (taskErr) return resolve();
@@ -514,7 +514,11 @@ function seedRoleTasks() {
         if (!values.length) return resolve();
         const placeholders = values.map(() => '(?, ?)').join(', ');
         const params = values.flat();
-        db.run(`INSERT INTO role_tasks (role, task_id) VALUES ${placeholders}`, params, () => resolve());
+        db.run(
+          `INSERT INTO role_tasks (role, task_id) VALUES ${placeholders} ON CONFLICT (role, task_id) DO NOTHING`,
+          params,
+          () => resolve()
+        );
       });
     });
   });
